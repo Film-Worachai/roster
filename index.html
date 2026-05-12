@@ -542,7 +542,25 @@
         let y = parseInt(document.getElementById('inputYear').value);
         let ls = document.getElementById('lateShiftHist').value;
         let offsets =[0,1,2,3].map(i => parseInt(document.getElementById('pattern'+i).value));
-        if (new Set(offsets).size !== 4) return alert("รูปแบบเวรซ้ำกัน โปรดเลือกให้ต่างกันครับ!");
+        
+        if (new Set(offsets).size !== 4) return alert("รูปแบบเวรซ้ำกัน !");
+
+        if (historyBlocks.length > 0) {
+            let prevBlock = historyBlocks[historyBlocks.length - 1];
+            let prevPat = ['M', prevBlock.lateShift, 'O', 'O'];
+            let newPat = ['M', ls, 'O', 'O'];
+            
+            for (let i = 0; i < 4; i++) {
+                let lastDayIndex = prevBlock.days - 1;
+                let lastShiftOfPrevMonth = prevPat[(lastDayIndex + prevBlock.offsets[i]) % 4];
+
+                let firstShiftOfNewMonth = newPat[offsets[i] % 4];
+                
+                if ((lastShiftOfPrevMonth === 'N' || lastShiftOfPrevMonth === 'A') && firstShiftOfNewMonth === 'M') {
+                    return alert(`❌ ไม่สามารถบันทึกได้!\nเดือนก่อนหน้ารอยต่อไม่ถูกต้อง: ${persons[i]} ลงกะดึก (${lastShiftOfPrevMonth}) ในวันสุดท้าย ต่อด้วยกะเช้า (M) ในวันที่ 1\n\nโปรดปรับรูปแบบเวรใหม่ครับ`);
+                }
+            }
+        }
 
         historyBlocks.push({ m, y, days: new Date(y, m, 0).getDate(), offsets, lateShift: ls });
         localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
