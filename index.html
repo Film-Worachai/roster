@@ -331,7 +331,6 @@
         populateMonthSelect(selectId, yearId);
     }
 
-    // ฟังก์ชันสำหรับเซ็ตค่าเริ่มต้นให้หน้าเว็บและอัปเดต UI
     function initializeUI() {
         for(let i=0; i<4; i++) {
             let nameInput = document.getElementById('name'+i);
@@ -372,22 +371,20 @@
         updateLockTableUI();
     }
 
-    // แก้ไขตอนโหลดหน้าจอ ให้เช็คเครื่องก่อน ถ้าไม่มีให้ไปโหลดจากไฟล์ JSON 
     window.onload = async () => {
         const sb = localStorage.getItem('shiftHistoryBlocks');
         const sp = localStorage.getItem('shiftPersons');
         const sl = localStorage.getItem('shiftLocksJSON');
+        const isClearedManually = localStorage.getItem('isClearedManually'); // 💡 เช็ค Flag ว่าเคยล้างไปหรือยัง
 
-        // ถ้าในเครื่องผู้ใช้มีข้อมูลอยู่แล้ว ให้ใช้ข้อมูลนั้น
         if (sp && sb) {
             persons = JSON.parse(sp);
             historyBlocks = JSON.parse(sb);
             if (sl) allLocks = JSON.parse(sl);
             initializeUI();
-        } else {
-            // ถ้าเป็นผู้ใช้ใหม่ ไม่มีข้อมูล ให้โหลดจากไฟล์ JSON บนเซิร์ฟเวอร์
+        } else if (!isClearedManually) {
+            // ถ้าไม่เคยมีข้อมูล และไม่เคยกด "ล้างทั้งหมด" ให้ดึงจาก JSON
             try {
-                // ⚠️ สำคัญ: เปลี่ยนชื่อไฟล์ตรงนี้ให้ตรงกับที่คุณอัปโหลดไว้บน GitHub
                 const response = await fetch('./shift_data_backup.json'); 
                 if (!response.ok) throw new Error('ไม่พบไฟล์ข้อมูลเริ่มต้น');
                 
@@ -396,16 +393,21 @@
                 if (masterData.historyBlocks) historyBlocks = masterData.historyBlocks;
                 if (masterData.allLocks) allLocks = masterData.allLocks;
                 
-                // สั่งบันทึกลงเครื่องผู้ใช้ทันที
                 localStorage.setItem('shiftPersons', JSON.stringify(persons));
                 localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
                 localStorage.setItem('shiftLocksJSON', JSON.stringify(allLocks));
                 
                 initializeUI();
             } catch (error) {
-                console.warn('โหลดข้อมูลเริ่มต้นไม่สำเร็จ จะใช้ค่าว่างแทน:', error);
-                initializeUI(); // โหลดหน้าเว็บขึ้นมาเปล่าๆ ให้ใช้งานได้
+                console.warn('โหลดข้อมูลเริ่มต้นไม่สำเร็จ:', error);
+                initializeUI(); 
             }
+        } else {
+            // 💡 ถ้าเคยกดปุ่มล้างข้อมูลมาแล้ว ให้เปิดหน้าเว็บว่างๆ เลย ไม่ต้องโหลด JSON กลับมาอีก
+            persons = ['KOMKRIT', 'NATTHAPOL', 'KONCHANOK', 'WORACHAI'];
+            historyBlocks = [];
+            allLocks = {};
+            initializeUI();
         }
     };
 
@@ -456,6 +458,8 @@
                 if (importedData.persons) localStorage.setItem('shiftPersons', JSON.stringify(importedData.persons));
                 if (importedData.historyBlocks) localStorage.setItem('shiftHistoryBlocks', JSON.stringify(importedData.historyBlocks));
                 if (importedData.allLocks) localStorage.setItem('shiftLocksJSON', JSON.stringify(importedData.allLocks));
+                // 💡 ถ้านำเข้าข้อมูลสำเร็จ ให้ล้างสถานะ "เคยกดล้างข้อมูล" ทิ้งไป เพื่อให้ระบบกลับมาทำงานปกติ
+                localStorage.removeItem('isClearedManually');
                 alert("✅ นำเข้าข้อมูลสำเร็จ! ระบบจะทำการโหลดหน้าเว็บใหม่");
                 location.reload();
             } catch (error) { alert("❌ เกิดข้อผิดพลาด! ไฟล์ข้อมูลไม่ถูกต้องหรือไม่สามารถอ่านได้"); }
@@ -496,6 +500,8 @@
 
         historyBlocks.push({ m, y, days: new Date(y, m, 0).getDate(), offsets, lateShift: ls });
         localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
+        // เมื่อมีการเพิ่มข้อมูลใหม่ ให้ล้างสถานะ "การล้างข้อมูล" ทิ้งไป
+        localStorage.removeItem('isClearedManually');
         
         let nm = m + 1, ny = y; if(nm > 12) { nm=1; ny++; }
         
@@ -519,7 +525,6 @@
         c.innerHTML = '';
         historyBlocks.forEach(b => {
             let fullText = getFullMonthText(b.m, b.y);
-            // แสดงเป็น (MA) หรือ (MN)
             c.innerHTML += `<div class="history-badge">✔️ ${fullText} <span style="color:var(--primary); font-weight:700;">(M${b.lateShift})</span></div>`;
         });
         document.getElementById('historyCountStr').innerText = historyBlocks.length + " เดือน";
@@ -701,7 +706,6 @@
         let m = v.reduce((a,b)=>a+b,0)/v.length; return v.reduce((a,b)=>a+Math.pow(b-m,2),0)/v.length;
     }
 
-    // ฟังก์ชันหาค่าเบี่ยงเบนมาตรฐาน เพื่อให้สเกลตัวเลขสมดุลกว่า Variance
     function getStdDev(obj) {
         let v = Object.values(obj); if(!v.length) return 0;
         let m = v.reduce((a,b)=>a+b,0)/v.length;
@@ -736,7 +740,7 @@
         }
         
         let simStreaks = {work:{}, off:{}};
-        let hardPenalty = 0; // ตัวแปรเก็บคะแนนลงโทษ
+        let hardPenalty = 0; 
         
         for(let i=0; i<4; i++) {
             let fullHist = currentHist[i].concat(simHistoryForStreak[i]);
@@ -744,9 +748,7 @@
             simStreaks.work[i] = strk.workInst; 
             simStreaks.off[i] = strk.offInst;
 
-            // --- เพิ่มกฎเหล็ก (Hard Penalty) ---
             let currentWorkStreak = 0;
-            // เช็คการทำเวรติดกัน ห้ามเกิน 4 วัน
             for(let s of fullHist.slice(-10)) { 
                 if (s !== 'O') {
                     currentWorkStreak++;
@@ -757,13 +759,12 @@
             }
         }
 
-        // --- คำนวณคะแนนด้วย Standard Deviation และระบบถ่วงน้ำหนักใหม่ ---
         return hardPenalty + 
-               (getStdDev(simStats.workDays) * 200) +   // #1 ยังให้ชั่วโมงรวมสำคัญที่สุด
-               (getStdDev(simStreaks.work) * 100) +     // [ปรับเพิ่ม] บังคับ 'ทำติด 3 วัน' ให้เฉลี่ยเท่าๆ กัน
-               (getStdDev(simStreaks.off) * 100) +      // [ปรับเพิ่ม] บังคับ 'หยุดติด 3 วัน' ให้เฉลี่ยเท่าๆ กัน
-               (getStdDev(simFirstDayM) * 100) +        // [ปรับเพิ่ม] บังคับ 'M วันที่ 1' ให้เฉลี่ยเท่าๆ กัน
-               (getStdDev(simStats.pairs) * 10);        // ให้การจับคู่เวรยอมยืดหยุ่นได้
+               (getStdDev(simStats.workDays) * 200) +   
+               (getStdDev(simStreaks.work) * 100) +     
+               (getStdDev(simStreaks.off) * 100) +      
+               (getStdDev(simFirstDayM) * 100) +        
+               (getStdDev(simStats.pairs) * 10);        
     }
 
     async function generateFutureSchedule() {
@@ -954,7 +955,6 @@
         const tbody = document.querySelector(`#${id} tbody`); tbody.innerHTML = '';
         persons.forEach((p, i) => {
             let streaks = getStreakCounts(histObj[i] ||[]);
-            // ปรับแต่งแถวให้ตัวอักษรเป็นตัวหนาทั้งหมด (bold)
             tbody.innerHTML += `<tr style="font-weight: bold;">
                 <td style="text-align: left; padding-left: 10px;">${p}</td>
                 <td>${s.workDays[i]*12}</td>
@@ -968,7 +968,6 @@
     function renderPairMatrix(id, s) {
         let html = '<table class="matrix-table"><thead><tr><th>M \\ A,N</th>';
         persons.forEach(p => html += `<th>${p.substring(0,3)}</th>`);
-        // ปรับแต่งเนื้อหาตารางให้เป็นตัวหนา
         html += '</tr></thead><tbody style="font-weight: bold;">';
         persons.forEach((p, i) => {
             html += `<tr><td>${p.substring(0,3)}</td>`;
@@ -992,7 +991,14 @@
         return res;
     }
 
-    function clearDatabase() { if(confirm("ล้างข้อมูลทั้งหมด? การตั้งค่าและประวัติจะหายทั้งหมด")) { localStorage.clear(); location.reload(); } }
+    // 💡 แก้ไขฟังก์ชัน clearDatabase ให้มีการบันทึกสถานะว่า "เคยกดล้างข้อมูลแล้ว"
+    function clearDatabase() { 
+        if(confirm("ล้างข้อมูลทั้งหมด? การตั้งค่าและประวัติจะหายทั้งหมด")) { 
+            localStorage.clear(); 
+            localStorage.setItem('isClearedManually', 'true'); // สั่งห้ามดึง JSON อัตโนมัติ
+            location.reload(); 
+        } 
+    }
 </script>
 
 </body>
