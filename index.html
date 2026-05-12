@@ -1261,7 +1261,7 @@
                 let statusHTML = "";
 
                 if (isPerfect) {
-                    statusHTML = `✅ จัด ROSTER สำเร็จ! (ล่วงหน้า ${finalRes.length} เดือน)`;
+                    statusHTML = `✅ จัด ROSTER สำเร็จ! (${finalRes.length} เดือน)`;
                     document.getElementById('resultStatus').style.color = "var(--success)";
                 } else {
                     statusHTML = `⚠️ จัดผ่านวันล็อคสำเร็จ! แต่ชนขีดจำกัดสูงสุด ${finalRes.length} เดือน (ชั่วโมงอาจไม่เท่ากันเป๊ะ)`;
