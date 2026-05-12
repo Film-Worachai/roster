@@ -147,6 +147,7 @@
         <div class="flex-between" style="margin-bottom: 20px;">
             <h3 class="card-title" style="color: var(--primary); margin: 0;">📂 1. จัดการประวัติเวรย้อนหลัง</h3>
             <div class="action-group">
+                <button class="btn-outline" style="color: #8B5CF6; border-color: #C4B5FD; padding: 6px 12px; font-size: 12px;" onclick="fetchDataFromGitHub()">☁️ โหลดข้อมูล</button>
                 <button class="btn-outline" style="color: var(--primary); border-color: #93C5FD; padding: 6px 12px; font-size: 12px;" onclick="exportDataJSON()">💾 ส่งออกข้อมูล</button>
                 <button class="btn-outline" style="color: var(--warning); border-color: #FCD34D; padding: 6px 12px; font-size: 12px;" onclick="document.getElementById('importFileInput').click()">📂 นำเข้าข้อมูล</button>
                 <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="importDataJSON(event)">
@@ -375,7 +376,7 @@
         const sb = localStorage.getItem('shiftHistoryBlocks');
         const sp = localStorage.getItem('shiftPersons');
         const sl = localStorage.getItem('shiftLocksJSON');
-        const isClearedManually = localStorage.getItem('isClearedManually'); // 💡 เช็ค Flag ว่าเคยล้างไปหรือยัง
+        const isClearedManually = localStorage.getItem('isClearedManually'); 
 
         if (sp && sb) {
             persons = JSON.parse(sp);
@@ -383,7 +384,6 @@
             if (sl) allLocks = JSON.parse(sl);
             initializeUI();
         } else if (!isClearedManually) {
-            // ถ้าไม่เคยมีข้อมูล และไม่เคยกด "ล้างทั้งหมด" ให้ดึงจาก JSON
             try {
                 const response = await fetch('./shift_data_backup.json'); 
                 if (!response.ok) throw new Error('ไม่พบไฟล์ข้อมูลเริ่มต้น');
@@ -403,13 +403,44 @@
                 initializeUI(); 
             }
         } else {
-            // 💡 ถ้าเคยกดปุ่มล้างข้อมูลมาแล้ว ให้เปิดหน้าเว็บว่างๆ เลย ไม่ต้องโหลด JSON กลับมาอีก
             persons = ['KOMKRIT', 'NATTHAPOL', 'KONCHANOK', 'WORACHAI'];
             historyBlocks = [];
             allLocks = {};
             initializeUI();
         }
     };
+
+    async function fetchDataFromGitHub() {
+        if (!confirm("การโหลดข้อมูล จะเขียนทับข้อมูลประวัติเวรปัจจุบันของคุณทั้งหมด\n\nคุณแน่ใจหรือไม่ที่จะดำเนินการต่อ?")) {
+            return;
+        }
+
+        try {
+            const response = await fetch('./shift_data_backup.json');
+            if (!response.ok) throw new Error('ไม่พบไฟล์ข้อมูลในระบบ');
+
+            const masterData = await response.json();
+            
+            if (masterData.persons) persons = masterData.persons;
+            if (masterData.historyBlocks) historyBlocks = masterData.historyBlocks;
+            if (masterData.allLocks) allLocks = masterData.allLocks;
+
+            // บันทึกทับลงเครื่อง
+            localStorage.setItem('shiftPersons', JSON.stringify(persons));
+            localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
+            localStorage.setItem('shiftLocksJSON', JSON.stringify(allLocks));
+            
+            // ยกเลิกสถานะการล้างข้อมูล เพื่อให้กลับมาอิงข้อมูลนี้
+            localStorage.removeItem('isClearedManually');
+
+            alert("✅ ดึงข้อมูลสำเร็จ! ระบบจะทำการโหลดหน้าเว็บใหม่");
+            location.reload();
+
+        } catch (error) {
+            console.warn(error);
+            alert("❌ เกิดข้อผิดพลาด: ไม่สามารถดึงข้อมูลจากเซิร์ฟเวอร์ได้ (โปรดตรวจสอบว่ามีไฟล์ shift_data_backup.json อยู่บน GitHub หรือไม่)");
+        }
+    }
 
     function copyTableToExcel(tableId) {
         var el = document.getElementById(tableId);
@@ -458,7 +489,6 @@
                 if (importedData.persons) localStorage.setItem('shiftPersons', JSON.stringify(importedData.persons));
                 if (importedData.historyBlocks) localStorage.setItem('shiftHistoryBlocks', JSON.stringify(importedData.historyBlocks));
                 if (importedData.allLocks) localStorage.setItem('shiftLocksJSON', JSON.stringify(importedData.allLocks));
-                // 💡 ถ้านำเข้าข้อมูลสำเร็จ ให้ล้างสถานะ "เคยกดล้างข้อมูล" ทิ้งไป เพื่อให้ระบบกลับมาทำงานปกติ
                 localStorage.removeItem('isClearedManually');
                 alert("✅ นำเข้าข้อมูลสำเร็จ! ระบบจะทำการโหลดหน้าเว็บใหม่");
                 location.reload();
@@ -500,7 +530,6 @@
 
         historyBlocks.push({ m, y, days: new Date(y, m, 0).getDate(), offsets, lateShift: ls });
         localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
-        // เมื่อมีการเพิ่มข้อมูลใหม่ ให้ล้างสถานะ "การล้างข้อมูล" ทิ้งไป
         localStorage.removeItem('isClearedManually');
         
         let nm = m + 1, ny = y; if(nm > 12) { nm=1; ny++; }
@@ -991,11 +1020,10 @@
         return res;
     }
 
-    // 💡 แก้ไขฟังก์ชัน clearDatabase ให้มีการบันทึกสถานะว่า "เคยกดล้างข้อมูลแล้ว"
     function clearDatabase() { 
         if(confirm("ล้างข้อมูลทั้งหมด? การตั้งค่าและประวัติจะหายทั้งหมด")) { 
             localStorage.clear(); 
-            localStorage.setItem('isClearedManually', 'true'); // สั่งห้ามดึง JSON อัตโนมัติ
+            localStorage.setItem('isClearedManually', 'true');
             location.reload(); 
         } 
     }
