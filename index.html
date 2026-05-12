@@ -832,30 +832,50 @@
         return { work3Inst, workOver3Inst, off3Inst, off4Inst };
     };
 
-    function renderTable(id, histObj, s) {
+    function renderTable(id, histObj, s, baseHistObj = null, baseS = null) {
         const tbody = document.querySelector(`#${id} tbody`); tbody.innerHTML = '';
+        
+        const fDiff = (nv, ov) => {
+            if (ov == null) return nv;
+            let d = nv - ov;
+            if (d > 0) return `${nv} <span style="color: var(--success); font-size: 0.9em; font-weight: normal;">(+${d})</span>`;
+            if (d < 0) return `${nv} <span style="color: var(--danger); font-size: 0.9em; font-weight: normal;">(${d})</span>`;
+            return nv;
+        };
+
         persons.forEach((p, i) => {
             let streaks = getStreakCounts(histObj[i] ||[]);
+            let baseStreaks = baseHistObj ? getStreakCounts(baseHistObj[i] || []) : null;
+
             tbody.innerHTML += `<tr style="font-weight: bold;">
                 <td style="text-align: left; padding-left: 10px;">${escapeHTML(p)}</td>
-                <td>${s.workDays[i]*12}</td>
-                <td>${streaks.work3Inst}</td>
-                <td>${streaks.off3Inst}</td>
-                <td>${streaks.off4Inst}</td> 
-                <td>${s.firstDayM[i]}</td>
+                <td>${fDiff(s.workDays[i]*12, baseS ? baseS.workDays[i]*12 : null)}</td>
+                <td>${fDiff(streaks.work3Inst, baseStreaks ? baseStreaks.work3Inst : null)}</td>
+                <td>${fDiff(streaks.off3Inst, baseStreaks ? baseStreaks.off3Inst : null)}</td>
+                <td>${fDiff(streaks.off4Inst, baseStreaks ? baseStreaks.off4Inst : null)}</td> 
+                <td>${fDiff(s.firstDayM[i], baseS ? baseS.firstDayM[i] : null)}</td>
             </tr>`;
         });
     }
 
-    function renderPairMatrix(id, s) {
+    function renderPairMatrix(id, s, baseS = null) {
         let html = '<table class="matrix-table"><thead><tr><th>M \\ A,N</th>';
         persons.forEach(p => html += `<th>${escapeHTML(p).substring(0,3)}</th>`);
         html += '</tr></thead><tbody style="font-weight: bold;">';
+        
+        const fDiff = (nv, ov) => {
+            if (ov == null) return nv;
+            let d = nv - ov;
+            if (d > 0) return `${nv} <span style="color: var(--success); font-size: 0.9em; font-weight: normal;">(+${d})</span>`;
+            if (d < 0) return `${nv} <span style="color: var(--danger); font-size: 0.9em; font-weight: normal;">(${d})</span>`;
+            return nv;
+        };
+
         persons.forEach((p, i) => {
             html += `<tr><td>${escapeHTML(p).substring(0,3)}</td>`;
             persons.forEach((p2, j) => {
                 if(i === j) html += '<td style="background:var(--bg); color: var(--text-muted);">-</td>';
-                else html += `<td>${s.pairs[`${i},${j}`]||0}</td>`;
+                else html += `<td>${fDiff(s.pairs[`${i},${j}`]||0, baseS ? (baseS.pairs[`${i},${j}`]||0) : null)}</td>`;
             });
             html += '</tr>';
         });
@@ -871,7 +891,9 @@
             });
             localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
             alert("✅ เพิ่มไปยังประวัติเวรเรียบร้อยแล้ว!");
-            refreshAllViews(); 
+            
+            initializeUI(); 
+            document.getElementById('rosterActionContainer').style.display = 'none'; 
         }
     }
 
@@ -1240,8 +1262,11 @@
                 }
 
                 document.getElementById('resultStatus').innerHTML = statusHTML;
-                renderTable('finalPersonTable', lastRes.historySnapshot, lastRes.statsAtEnd);
-                renderPairMatrix('finalPairMatrixContainer', lastRes.statsAtEnd);
+                let baseH = buildBaseHistory(historyBlocks);
+                let baseS = calculateStats(baseH, historyBlocks);
+                
+                renderTable('finalPersonTable', lastRes.historySnapshot, lastRes.statsAtEnd, baseH, baseS);
+                renderPairMatrix('finalPairMatrixContainer', lastRes.statsAtEnd, baseS);
                 renderFinalTables(finalRes);
                 
                 document.getElementById('outputSection').scrollIntoView({ behavior: 'smooth' });
