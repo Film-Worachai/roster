@@ -255,7 +255,7 @@
         <div class="grid-2">
             <div class="table-responsive">
                 <table id="histPersonTable">
-                    <thead><tr><th>พนักงาน</th><th>ชม.รวม</th><th>ทำติด 3 วัน</th><th>หยุดติด 3 วัน</th><th>M วันที่ 1</th></tr></thead>
+                    <thead><tr><th>พนักงาน</th><th>ชม.รวม</th><th>ทำติด 3 วัน</th><th>หยุดติด 3 วัน</th><th>หยุดติด 4 วัน</th><th>M วันที่ 1</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -305,7 +305,12 @@
 
             <div id="finalStatsContainer" style="display: none;">
                 <div class="grid-2 mt-3">
-                    <div class="table-responsive"><table id="finalPersonTable"><thead><tr><th>พนักงาน</th><th>ชม.รวม</th><th>ทำติด 3 วัน</th><th>หยุดติด 3 วัน</th><th>M วันที่ 1</th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-responsive">
+                        <table id="finalPersonTable">
+                            <thead><tr><th>NAME</th><th>=ชั่วโมงรวม</th><th>ทำติดกัน 3 วัน</th><th>หยุดติดกัน 3 วัน</th><th>หยุดติดกัน 4 วัน</th><th>M วันที่ 1</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                     <div class="table-responsive" id="finalPairMatrixContainer"></div>
                 </div>
             </div>
@@ -353,7 +358,6 @@
         return `${mm} ${monthNamesTH[m]} พ.ศ. ${be} ${monthNamesEN[m]} ${y}`;
     }
 
-    // ฟังก์ชันใหม่สำหรับเดือนและปีแบบย่อ (เช่น ต.ค. 68)
     function getShortMonthText(m, y) {
         let be = parseInt(y) + 543;
         return `${monthNamesTHShort[m]} ${String(be).slice(-2)}`;
@@ -553,7 +557,6 @@
             for (let i = 0; i < 4; i++) {
                 let lastDayIndex = prevBlock.days - 1;
                 let lastShiftOfPrevMonth = prevPat[(lastDayIndex + prevBlock.offsets[i]) % 4];
-
                 let firstShiftOfNewMonth = newPat[offsets[i] % 4];
                 
                 if ((lastShiftOfPrevMonth === 'N' || lastShiftOfPrevMonth === 'A') && firstShiftOfNewMonth === 'M') {
@@ -576,7 +579,6 @@
         refreshAllViews();
     }
 
-    // แก้ไขให้ดึงเดือนปีแบบย่อมาแสดง
     function renderHistoryBadges() {
         const c = document.getElementById('historyBadgesContainer');
         c.innerHTML = '';
@@ -768,7 +770,6 @@
         } 
     }
 
-    // --- Helper Functions for Main UI ---
     function buildBaseHistory(blocks) {
         let h = {0:[], 1:[], 2:[], 3:[]};
         for (let b = 0; b < blocks.length; b++) {
@@ -807,14 +808,28 @@
     }
 
     const getStreakCounts = (historyArray) => {
-        let workInst = 0, offInst = 0, wStreak = 0, oStreak = 0;
+        let work3Inst = 0, workOver3Inst = 0, off3Inst = 0, off4Inst = 0;
+        let wStreak = 0, oStreak = 0;
         for (let i = 0; i < historyArray.length; i++) {
             let s = historyArray[i];
-            if (s !== 'O') { wStreak++; if(oStreak >= 3) offInst++; oStreak=0; } 
-            else { oStreak++; if(wStreak >= 3) workInst++; wStreak=0; }
+            if (s !== 'O') {
+                wStreak++;
+                if (oStreak === 3) off3Inst++;
+                else if (oStreak >= 4) off4Inst++;
+                oStreak = 0;
+            } else {
+                oStreak++;
+                if (wStreak === 3) work3Inst++;
+                else if (wStreak > 3) workOver3Inst++;
+                wStreak = 0;
+            }
         }
-        if (oStreak >= 3) offInst++; if (wStreak >= 3) workInst++;
-        return { workInst, offInst };
+        if (oStreak === 3) off3Inst++;
+        else if (oStreak >= 4) off4Inst++;
+        if (wStreak === 3) work3Inst++;
+        else if (wStreak > 3) workOver3Inst++;
+
+        return { work3Inst, workOver3Inst, off3Inst, off4Inst };
     };
 
     function renderTable(id, histObj, s) {
@@ -824,8 +839,9 @@
             tbody.innerHTML += `<tr style="font-weight: bold;">
                 <td style="text-align: left; padding-left: 10px;">${escapeHTML(p)}</td>
                 <td>${s.workDays[i]*12}</td>
-                <td>${streaks.workInst}</td>
-                <td>${streaks.offInst}</td>
+                <td>${streaks.work3Inst}</td>
+                <td>${streaks.off3Inst}</td>
+                <td style="color: var(--success);">${streaks.off4Inst}</td>
                 <td>${s.firstDayM[i]}</td>
             </tr>`;
         });
@@ -913,14 +929,28 @@
             }
 
             const getStreakCounts = (historyArray) => {
-                let workInst = 0, offInst = 0, wStreak = 0, oStreak = 0;
+                let work3Inst = 0, workOver3Inst = 0, off3Inst = 0, off4Inst = 0;
+                let wStreak = 0, oStreak = 0;
                 for (let i = 0; i < historyArray.length; i++) {
                     let s = historyArray[i];
-                    if (s !== 'O') { wStreak++; if(oStreak >= 3) offInst++; oStreak=0; } 
-                    else { oStreak++; if(wStreak >= 3) workInst++; wStreak=0; }
+                    if (s !== 'O') {
+                        wStreak++;
+                        if (oStreak === 3) off3Inst++;
+                        else if (oStreak >= 4) off4Inst++;
+                        oStreak = 0;
+                    } else {
+                        oStreak++;
+                        if (wStreak === 3) work3Inst++;
+                        else if (wStreak > 3) workOver3Inst++;
+                        wStreak = 0;
+                    }
                 }
-                if (oStreak >= 3) offInst++; if (wStreak >= 3) workInst++;
-                return { workInst, offInst };
+                if (oStreak === 3) off3Inst++;
+                else if (oStreak >= 4) off4Inst++;
+                if (wStreak === 3) work3Inst++;
+                else if (wStreak > 3) workOver3Inst++;
+
+                return { work3Inst, workOver3Inst, off3Inst, off4Inst };
             };
 
             function getPermutations(arr) {
@@ -958,21 +988,28 @@
                     if(mPerson !== -1 && latePerson !== -1) simStats.pairs[mPerson+','+latePerson]++;
                 }
                 
-                let simStreaks = {work:{}, off:{}};
+                let simStreaks = {work3:{}, off3:{}, off4:{}};
                 let hardPenalty = 0; 
+                let totalOff3Streaks = 0; 
+                let totalOff4Streaks = 0; 
                 
                 for(let i=0; i<4; i++) {
                     let fullHist = currentHist[i].concat(simHistoryForStreak[i]);
                     let strk = getStreakCounts(fullHist);
-                    simStreaks.work[i] = strk.workInst; 
-                    simStreaks.off[i] = strk.offInst;
+                    
+                    simStreaks.work3[i] = strk.work3Inst; 
+                    simStreaks.off3[i] = strk.off3Inst;
+                    simStreaks.off4[i] = strk.off4Inst;
+                    
+                    totalOff3Streaks += strk.off3Inst;
+                    totalOff4Streaks += strk.off4Inst;
 
                     let currentWorkStreak = 0;
                     let startIdx = Math.max(0, fullHist.length - 10);
                     for(let j = startIdx; j < fullHist.length; j++) { 
                         if (fullHist[j] !== 'O') {
                             currentWorkStreak++;
-                            if (currentWorkStreak > 4) hardPenalty += 2000; 
+                            if (currentWorkStreak > 3) hardPenalty += 5000; 
                         } else {
                             currentWorkStreak = 0;
                         }
@@ -980,12 +1017,15 @@
                 }
 
                 return hardPenalty + 
-                       (getStdDev(simStats.workDays) * 300) +     
-                       (getStdDev(simStats.lateShifts) * 100) +   
-                       (getStdDev(simStreaks.work) * 100) +     
-                       (getStdDev(simStreaks.off) * 100) +      
-                       (getStdDev(simFirstDayM) * 100) +        
-                       (getStdDev(simStats.pairs) * 10);        
+                       (getStdDev(simStats.workDays) * 1500) +    // ล็อคชั่วโมงรวมให้เท่ากัน (สำคัญอันดับ 1)
+                       (getStdDev(simStats.lateShifts) * 800) +   // ล็อคกะดึกให้เท่ากัน (สำคัญอันดับ 2)
+                       (getStdDev(simStreaks.off4) * 600) +       // บังคับให้การกระจาย "หยุด 4 วัน" เท่ากัน
+                       (getStdDev(simStreaks.off3) * 400) +       // บังคับให้การกระจาย "หยุด 3 วัน" เท่ากัน
+                       (getStdDev(simStreaks.work3) * 400) +      // บังคับให้ทำเวรติด 3 วัน โดนเท่าๆ กัน
+                       (getStdDev(simFirstDayM) * 50) +        
+                       (getStdDev(simStats.pairs) * 10) - 
+                       (totalOff4Streaks * 800) -                 // 🎯 โบนัสหลัก: หาหยุด 4 วันให้เจอก่อน
+                       (totalOff3Streaks * 300);                  // 🎯 โบนัสรอง: ถ้าหา 4 ไม่ได้ ก็เอา 3 วันมาแทน
             }
 
             const perms = getPermutations([0,1,2,3]);
@@ -1141,7 +1181,6 @@
         };
     }
 
-    // --- Main Thread Execution ---
     function generateFutureSchedule() {
         if(historyBlocks.length === 0) return alert("กรุณาใส่ประวัติอย่างน้อย 1 เดือนก่อนครับ");
         
@@ -1156,7 +1195,6 @@
         document.getElementById('outputSection').style.display = 'block';
         document.getElementById('rosterActionContainer').style.display = 'none';
         
-        // ซ่อนกรอบตารางหัวตารางระหว่างที่กำลังโหลดรอผล
         document.getElementById('finalStatsContainer').style.display = 'none';
         
         document.getElementById('monthlyTables').innerHTML = '';
@@ -1188,7 +1226,6 @@
                 window.generatedRoster = finalRes; 
                 document.getElementById('rosterActionContainer').style.display = 'flex'; 
 
-                // แสดงกรอบตารางหลังจากโหลดผลสำเร็จแล้ว
                 document.getElementById('finalStatsContainer').style.display = 'block';
 
                 let statusHTML = "";
