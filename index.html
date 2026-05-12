@@ -1051,8 +1051,8 @@
                     (getStdDev(simStreaks.off4) * 450) +       // 2. หยุด 4 วัน สำคัญรองลงมา
                     (getStdDev(simStreaks.off3) * 420) +       // 3. หยุด 3 วัน สำคัญตามมาติดๆ
                     (getStdDev(simStreaks.work3) * 400) +      // 4. ทำติด 3 วัน
-                    (getStdDev(simStats.pairs) * 320) +        // 5. คู่เวร (ยอมให้คู่เวรเบี้ยวได้นิดหน่อย เพื่อรักษาวันหยุด)
-                    (getStdDev(simFirstDayM) * 370) +          // 6. เปิดเดือนด้วย M
+                    (getStdDev(simFirstDayM) * 370) +          // 5. เปิดเดือนด้วย M                   
+                    (getStdDev(simStats.pairs) * 340) +        // 6. คู่เวร (ยอมให้คู่เวรเบี้ยวได้นิดหน่อย เพื่อรักษาวันหยุด)
                     (getStdDev(simStats.lateShifts) * 10) -    // 7. ไม่สนกะดึกเลย
                     (totalOff4Streaks * 450) -                 // โบนัส
                     (totalOff3Streaks * 300);                  // โบนัส
