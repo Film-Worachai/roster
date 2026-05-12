@@ -892,8 +892,15 @@
             localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
             alert("✅ เพิ่มไปยังประวัติเวรเรียบร้อยแล้ว!");
             
+            document.getElementById('outputSection').style.display = 'none';
+            
+            document.getElementById('monthlyTables').innerHTML = '';
+            document.getElementById('finalPersonTable').querySelector('tbody').innerHTML = '';
+            document.getElementById('finalPairMatrixContainer').innerHTML = '';
+            window.generatedRoster = [];
+
             initializeUI(); 
-            document.getElementById('rosterActionContainer').style.display = 'none'; 
+
         }
     }
 
