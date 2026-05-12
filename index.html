@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จัด Roster</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { 
+            --primary: #3B82F6; --primary-hover: #2563EB;
+            --success: #10B981; --success-hover: #059669;
+            --warning: #F59E0B; --warning-hover: #D97706;
+            --danger: #EF4444; --danger-hover: #DC2626;
+            --bg: #F4F7F9; --card: #FFFFFF; 
+            --text-main: #1E293B; --text-muted: #64748B;
+            --border: #E2E8F0; --input-bg: #F8FAFC;
+        }
+        
+        body { 
+            font-family: 'Prompt', Tahoma, sans-serif; 
+            background-color: var(--bg); 
+            color: var(--text-main); 
+            margin: 0; padding: 20px; 
+            font-size: 13px;
+        }
+        
+        .container { max-width: 100%; margin: 0; }
+        
+        .header { text-align: center; margin-bottom: 30px; margin-top: 10px; }
+        .header h1 { color: var(--primary); margin: 0; font-weight: 700; font-size: 28px; display: inline-flex; align-items: center; gap: 10px;}
+        
+        .card { 
+            background: var(--card); padding: 24px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); 
+            margin-bottom: 24px; 
+            border: 1px solid #EAEFEF;
+        }
+        
+        .card-title {
+            font-size: 18px; font-weight: 600; 
+            margin-top: 0; margin-bottom: 18px;
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+        
+        input, select { 
+            padding: 10px 14px; border: 1px solid var(--border); 
+            border-radius: 8px; font-family: inherit; font-size: 13px; 
+            background-color: var(--card); color: var(--text-main);
+            transition: all 0.2s ease; width: 100%; box-sizing: border-box;
+        }
+        input:focus, select:focus { 
+            outline: none; border-color: var(--primary); 
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); 
+        }
+        input[type="text"].table-input { width: 100%; border: none; background: transparent; padding: 0; text-align: center; font-weight: 600; font-size: 14px; color: var(--primary); }
+        input[type="text"].table-input:focus { box-shadow: none; border-bottom: 2px solid var(--primary); border-radius: 0; }
+        
+        button { 
+            padding: 10px 16px; border: none; border-radius: 8px; 
+            font-family: inherit; font-weight: 600; font-size: 13px;
+            cursor: pointer; transition: all 0.2s ease; 
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        button:active { transform: translateY(0); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+        
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+        
+        .btn-success { background-color: var(--success); color: white; width: 100%; font-size: 16px; padding: 16px; border-radius: 10px; }
+        .btn-success:hover { background-color: var(--success-hover); }
+        
+        .btn-danger { background-color: var(--danger); color: white; }
+        .btn-danger:hover { background-color: var(--danger-hover); }
+        
+        .btn-outline { background-color: transparent; border: 1px solid var(--border); color: var(--text-main); }
+        .btn-outline:hover { background-color: var(--input-bg); border-color: #94A3B8; }
+        
+        .table-responsive { overflow-x: auto; width: 100%; display: block; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; text-align: center; }
+        th, td { padding: 8px 6px; border: 1px solid var(--border); }
+        th { background-color: var(--input-bg); font-weight: 600; color: var(--text-muted); font-size: 12px; }
+        td { background-color: var(--card); }
+        
+        .matrix-table th { background-color: #EFF6FF; color: #1E3A8A; }
+        
+        .clickable-cell { cursor: pointer; user-select: none; font-weight: bold; width: 25px; height: 25px; transition: 0.1s; border-radius: 4px; font-size: 12px;}
+        .clickable-cell:hover { filter: brightness(0.95); transform: scale(1.1); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        
+        .shift-M { background-color: #DBEAFE; color: #1E40AF; } 
+        .shift-N, .shift-A { background-color: #FEF3C7; color: #92400E; } 
+        .shift-O { background-color: var(--bg); color: var(--text-muted); } 
+        .shift-None { background-color: var(--card); color: #CBD5E1; }
+        
+        .highlight { background-color: #FEF3C7; font-weight: bold; }
+        .locked-cell { position: relative; border: 2px solid var(--success) !important; box-shadow: inset 0 0 5px rgba(16, 185, 129, 0.2); }
+        .locked-cell::after { content: '🔒'; font-size: 9px; position: absolute; top: -4px; right: -4px; background: white; border-radius: 50%; padding: 1px;}
+        
+        .history-badge { 
+            background-color: #F1F5F9; color: var(--text-main); padding: 6px 14px; 
+            border-radius: 20px; font-size: 13px; font-weight: 500; 
+            border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 4px; margin: 3px; 
+        }
+        
+        .info-box { background: var(--input-bg); padding: 14px 18px; border-radius: 10px; border: 1px dashed var(--border); margin-bottom: 18px; }
+        
+        #outputSection { display: none; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* สไตล์ตารางรูปแบบ Excel */
+        .excel-table { 
+            border-collapse: collapse; width: 100%; text-align: center; 
+            font-size: 12px; font-family: 'Segoe UI', Arial, sans-serif; 
+            table-layout: auto; 
+        }
+        .excel-table th, .excel-table td { 
+            border: 1px solid #000000 !important; 
+            padding: 4px 2px !important; 
+        }
+        .excel-table th { background-color: #FFFFFF !important; font-weight: bold; color: #000; }
+        .excel-table td { background-color: #FFFFFF; color: #000; }
+        
+        /* Utility */
+        .mt-3 { margin-top: 18px; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .action-group { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .excel-table { font-size: 11px; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>🏥 จัด Roster</h1>
+    </div>
+
+    <div class="card" style="border-top: 5px solid var(--primary);">
+        <div class="flex-between" style="margin-bottom: 20px;">
+            <h3 class="card-title" style="color: var(--primary); margin: 0;">📂 1. จัดการประวัติเวรย้อนหลัง</h3>
+            <div class="action-group">
+                <button class="btn-outline" style="color: var(--primary); border-color: #93C5FD; padding: 6px 12px; font-size: 12px;" onclick="exportDataJSON()">💾 ส่งออกข้อมูล</button>
+                <button class="btn-outline" style="color: var(--warning); border-color: #FCD34D; padding: 6px 12px; font-size: 12px;" onclick="document.getElementById('importFileInput').click()">📂 นำเข้าข้อมูล</button>
+                <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="importDataJSON(event)">
+                <button class="btn-outline" style="color: var(--danger); border-color: #FCA5A5; padding: 6px 12px; font-size: 12px;" onclick="clearDatabase()">🗑️ ล้างทั้งหมด</button>
+            </div>
+        </div>
+        
+        <div class="info-box" style="background: #FFFFFF;">
+            <div class="flex-between" style="margin-bottom: 8px;">
+                <div><b>ประวัติที่บันทึกแล้ว: </b><span id="historyCountStr" style="color: var(--primary); font-weight: bold; font-size: 15px;">0 เดือน</span></div>
+                <button class="btn-outline" onclick="undoHistoryMonth()" style="color: var(--danger); border-color: #FCA5A5; padding: 4px 10px; font-size: 12px;">↩️ ลบเดือนล่าสุด</button>
+            </div>
+            <div id="historyBadgesContainer"></div>
+        </div>
+
+        <div style="background: var(--input-bg); padding: 20px; border-radius: 10px; border: 1px solid var(--border);">
+            <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--text-main); font-size: 15px; display: flex; align-items: center; gap: 6px;">
+                ➕ เพิ่มประวัติเดือนใหม่ด้วยตัวเอง
+            </h4>
+            
+            <div class="grid-controls">
+                <div class="form-group">
+                    <label>ปี (ค.ศ.)</label>
+                    <input type="number" id="inputYear" value="2026" onchange="onYearChange('inputMonth', 'inputYear'); updatePreview();">
+                </div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>เดือน</label>
+                    <select id="inputMonth" onchange="updatePreview()"></select>
+                </div>
+                <div class="form-group">
+                    <label>สัญลักษณ์กะดึก</label>
+                    <select id="lateShiftHist" onchange="updateHistDropdowns(); updatePreview();">
+                        <option value="N">ใช้ N (M N O O)</option>
+                        <option value="A">ใช้ A (M A O O)</option>
+                    </select>
+                </div>
+            </div>
+
+            <label style="font-size: 14px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 15px; margin-top: 25px; text-align: center;">รูปแบบเวรที่เริ่มในเดือนนี้</label>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin: 0 auto 25px auto; max-width: 450px;">
+                
+                <div style="display: flex; align-items: center; background: white; padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 2px 5px rgba(0,0,0,0.02); gap: 15px;">
+                    <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                        <span style="color: var(--text-muted); font-size: 16px;">👤</span>
+                        <input type="text" class="table-input" id="name0" value="KOMKRIT" oninput="updateNames()" style="text-align: left; margin: 0;">
+                    </div>
+                    <div style="flex: 1;">
+                        <select id="pattern0" onchange="updatePreview()" style="background: var(--input-bg); margin: 0; font-weight: 500;"></select>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; background: white; padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 2px 5px rgba(0,0,0,0.02); gap: 15px;">
+                    <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                        <span style="color: var(--text-muted); font-size: 16px;">👤</span>
+                        <input type="text" class="table-input" id="name1" value="NATTHAPOL" oninput="updateNames()" style="text-align: left; margin: 0;">
+                    </div>
+                    <div style="flex: 1;">
+                        <select id="pattern1" onchange="updatePreview()" style="background: var(--input-bg); margin: 0; font-weight: 500;"></select>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; background: white; padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 2px 5px rgba(0,0,0,0.02); gap: 15px;">
+                    <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                        <span style="color: var(--text-muted); font-size: 16px;">👤</span>
+                        <input type="text" class="table-input" id="name2" value="KONCHANOK" oninput="updateNames()" style="text-align: left; margin: 0;">
+                    </div>
+                    <div style="flex: 1;">
+                        <select id="pattern2" onchange="updatePreview()" style="background: var(--input-bg); margin: 0; font-weight: 500;"></select>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; background: white; padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 2px 5px rgba(0,0,0,0.02); gap: 15px;">
+                    <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                        <span style="color: var(--text-muted); font-size: 16px;">👤</span>
+                        <input type="text" class="table-input" id="name3" value="WORACHAI" oninput="updateNames()" style="text-align: left; margin: 0;">
+                    </div>
+                    <div style="flex: 1;">
+                        <select id="pattern3" onchange="updatePreview()" style="background: var(--input-bg); margin: 0; font-weight: 500;"></select>
+                    </div>
+                </div>
+
+            </div>
+            <button class="btn-primary" style="width: 100%; padding: 12px; font-size: 14px;" onclick="addHistoryMonth()">➕ บันทึกเดือนนี้ลงประวัติ</button>
+        </div>
+    </div>
+
+    <div id="savedHistoryTablesContainer"></div>
+
+    <div class="card" id="historyStatsSection">
+        <h3 class="card-title">📊 สถิติสะสมจากประวัติ</h3>
+        <div class="grid-2">
+            <div class="table-responsive">
+                <table id="histPersonTable">
+                    <thead><tr><th>พนักงาน</th><th>ชม.รวม</th><th>ทำติด 3 วัน</th><th>หยุดติด 3 วัน</th><th>M วันที่ 1</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="table-responsive" id="histPairMatrixContainer"></div>
+        </div>
+    </div>
+
+    <div class="card" style="border-top: 5px solid var(--success);">
+        <h3 class="card-title" style="color: var(--success);">✨ 2. วางแผนล็อคเวร</h3>
+        
+        <div class="grid-controls" style="background: #F0FDF4; padding: 18px; border-radius: 10px; border: 1px solid #BBF7D0;">
+            <div class="form-group">
+                <label style="color: var(--success-hover);">ปีที่ต้องการจัด</label>
+                <input type="number" id="lockYear" onchange="onYearChange('lockMonth', 'lockYear'); updateLockTableUI();">
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+                <label style="color: var(--success-hover);">เดือนที่ต้องการจัด</label>
+                <select id="lockMonth" onchange="updateLockTableUI()"></select>
+            </div>
+            <div class="form-group">
+                <label style="color: var(--success-hover);">กะดึก</label>
+                <select id="lateShiftFuture" onchange="updateLockTableUI()"><option value="N">N</option><option value="A">A</option></select>
+            </div>
+        </div>
+
+        <div class="info-box mt-3" style="background: var(--card);">
+            <div class="flex-between" style="margin-bottom: 12px;">
+                <span style="color: var(--success); font-weight: 600; font-size: 14px;">🔒 ตารางล็อคเวรล่วงหน้า</span>
+                <div class="action-group">
+                    <button class="btn-outline" style="padding: 6px 12px; font-size: 12px; color: var(--danger); border-color: var(--danger);" onclick="clearLocksForMonth()">🗑️ ล้างล็อคเดือนนี้</button>
+                    <button class="btn-outline" style="padding: 6px 12px; font-size: 12px; color: var(--danger); border-color: #FCA5A5;" onclick="clearAllLocks()">🗑️ ล้างล็อคทั้งหมด</button>
+                </div>
+            </div>
+            <div id="lockUiContainer" class="table-responsive" style="border: 1px solid var(--border);"></div>
+        </div>
+
+        <button class="btn-success mt-3" onclick="generateFutureSchedule()">🚀 จัด Roster</button>
+    </div>
+
+    <div id="outputSection">
+        <div class="card">
+            <h2 id="resultStatus" style="text-align:center; font-weight: 700; margin-top: 0; font-size: 20px;"></h2>
+            
+            <div class="mt-3" id="rosterActionContainer" style="display: none; background: #ECFDF5; padding: 15px 20px; border-radius: 10px; border: 1px solid #A7F3D0; justify-content: center; align-items: center;">
+                <button class="btn-success" style="width: auto; padding: 10px 20px; font-size: 14px; border-radius: 8px; box-shadow: 0 4px 6px rgba(16,185,129,0.2);" onclick="commitRosterToHistory()">📥 เพิ่มไปยังประวัติเวร</button>
+            </div>
+
+            <div class="grid-2 mt-3">
+                <div class="table-responsive"><table id="finalPersonTable"><thead><tr><th>พนักงาน</th><th>ชม.รวม</th><th>ทำติด 3 วัน</th><th>หยุดติด 3 วัน</th><th>M วันที่ 1</th></tr></thead><tbody></tbody></table></div>
+                <div class="table-responsive" id="finalPairMatrixContainer"></div>
+            </div>
+        </div>
+        <div id="monthlyTables"></div>
+    </div>
+</div>
+
+<script>
+    const monthNamesTH =["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+    const monthNamesEN =["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const dayNames =['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    let persons =['KOMKRIT', 'NATTHAPOL', 'KONCHANOK', 'WORACHAI'];
+    let historyBlocks =[]; 
+    let allLocks = {};
+    window.generatedRoster =[]; 
+
+    function getFullMonthText(m, y) {
+        let be = parseInt(y) + 543;
+        let mm = String(m).padStart(2, '0');
+        return `${mm} ${monthNamesTH[m]} พ.ศ. ${be} ${monthNamesEN[m]} ${y}`;
+    }
+
+    function populateMonthSelect(selectId, yearId) {
+        const sel = document.getElementById(selectId);
+        const y = document.getElementById(yearId).value || new Date().getFullYear();
+        const currentVal = sel.value || 1;
+        sel.innerHTML = '';
+        for(let i = 1; i <= 12; i++) {
+            let opt = document.createElement('option');
+            opt.value = i;
+            opt.innerText = getFullMonthText(i, y);
+            if(i == currentVal) opt.selected = true;
+            sel.appendChild(opt);
+        }
+    }
+
+    function onYearChange(selectId, yearId) {
+        populateMonthSelect(selectId, yearId);
+    }
+
+    // ฟังก์ชันสำหรับเซ็ตค่าเริ่มต้นให้หน้าเว็บและอัปเดต UI
+    function initializeUI() {
+        for(let i=0; i<4; i++) {
+            let nameInput = document.getElementById('name'+i);
+            if (nameInput && persons[i]) nameInput.value = persons[i];
+        }
+        
+        updateHistDropdowns();
+
+        if(historyBlocks.length > 0) {
+            let last = historyBlocks[historyBlocks.length-1];
+            let nm = last.m + 1, ny = last.y; if(nm > 12) { nm=1; ny++; }
+            
+            document.getElementById('inputYear').value = ny;
+            document.getElementById('lockYear').value = ny;
+            
+            populateMonthSelect('inputMonth', 'inputYear');
+            populateMonthSelect('lockMonth', 'lockYear');
+            
+            document.getElementById('inputMonth').value = nm;
+            document.getElementById('lockMonth').value = nm;
+            
+            for(let i=0; i<4; i++) document.getElementById('pattern'+i).value = (last.days + last.offsets[i]) % 4;
+        } else {
+            let now = new Date();
+            document.getElementById('inputYear').value = now.getFullYear();
+            document.getElementById('lockYear').value = now.getFullYear();
+            
+            populateMonthSelect('inputMonth', 'inputYear');
+            populateMonthSelect('lockMonth', 'lockYear');
+            
+            document.getElementById('inputMonth').value = now.getMonth() + 1;
+            document.getElementById('lockMonth').value = now.getMonth() + 1;
+        }
+
+        updatePreview();
+        renderHistoryBadges();
+        renderSavedHistoryTables();
+        updateLockTableUI();
+    }
+
+    // แก้ไขตอนโหลดหน้าจอ ให้เช็คเครื่องก่อน ถ้าไม่มีให้ไปโหลดจากไฟล์ JSON 
+    window.onload = async () => {
+        const sb = localStorage.getItem('shiftHistoryBlocks');
+        const sp = localStorage.getItem('shiftPersons');
+        const sl = localStorage.getItem('shiftLocksJSON');
+
+        // ถ้าในเครื่องผู้ใช้มีข้อมูลอยู่แล้ว ให้ใช้ข้อมูลนั้น
+        if (sp && sb) {
+            persons = JSON.parse(sp);
+            historyBlocks = JSON.parse(sb);
+            if (sl) allLocks = JSON.parse(sl);
+            initializeUI();
+        } else {
+            // ถ้าเป็นผู้ใช้ใหม่ ไม่มีข้อมูล ให้โหลดจากไฟล์ JSON บนเซิร์ฟเวอร์
+            try {
+                // ⚠️ สำคัญ: เปลี่ยนชื่อไฟล์ตรงนี้ให้ตรงกับที่คุณอัปโหลดไว้บน GitHub
+                const response = await fetch('./shift_data_backup.json'); 
+                if (!response.ok) throw new Error('ไม่พบไฟล์ข้อมูลเริ่มต้น');
+                
+                const masterData = await response.json();
+                if (masterData.persons) persons = masterData.persons;
+                if (masterData.historyBlocks) historyBlocks = masterData.historyBlocks;
+                if (masterData.allLocks) allLocks = masterData.allLocks;
+                
+                // สั่งบันทึกลงเครื่องผู้ใช้ทันที
+                localStorage.setItem('shiftPersons', JSON.stringify(persons));
+                localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
+                localStorage.setItem('shiftLocksJSON', JSON.stringify(allLocks));
+                
+                initializeUI();
+            } catch (error) {
+                console.warn('โหลดข้อมูลเริ่มต้นไม่สำเร็จ จะใช้ค่าว่างแทน:', error);
+                initializeUI(); // โหลดหน้าเว็บขึ้นมาเปล่าๆ ให้ใช้งานได้
+            }
+        }
+    };
+
+    function copyTableToExcel(tableId) {
+        var el = document.getElementById(tableId);
+        var lockIcons = el.querySelectorAll('.lock-icon');
+        lockIcons.forEach(icon => icon.innerText = '');
+
+        var body = document.body, range, sel;
+        if (document.createRange && window.getSelection) {
+            range = document.createRange();
+            sel = window.getSelection();
+            sel.removeAllRanges();
+            try { range.selectNodeContents(el); sel.addRange(range); } catch (e) { range.selectNode(el); sel.addRange(range); }
+            document.execCommand("copy");
+            sel.removeAllRanges();
+            
+            const btn = el.parentElement.querySelector('button');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "✅ คัดลอกแล้ว!";
+            btn.style.backgroundColor = "var(--success)";
+            setTimeout(() => { btn.innerHTML = originalText; btn.style.backgroundColor = "var(--success)"; }, 2000);
+        }
+
+        lockIcons.forEach(icon => icon.innerText = ' 🔒');
+    }
+
+    function exportDataJSON() {
+        const dataToExport = { persons: persons, historyBlocks: historyBlocks, allLocks: allLocks };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToExport, null, 2));
+        const downloadAnchorElement = document.createElement('a');
+        downloadAnchorElement.setAttribute("href", dataStr);
+        let now = new Date();
+        let fileName = `shift_data_backup_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.json`;
+        downloadAnchorElement.setAttribute("download", fileName);
+        document.body.appendChild(downloadAnchorElement); 
+        downloadAnchorElement.click();
+        downloadAnchorElement.remove();
+    }
+
+    function importDataJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (importedData.persons) localStorage.setItem('shiftPersons', JSON.stringify(importedData.persons));
+                if (importedData.historyBlocks) localStorage.setItem('shiftHistoryBlocks', JSON.stringify(importedData.historyBlocks));
+                if (importedData.allLocks) localStorage.setItem('shiftLocksJSON', JSON.stringify(importedData.allLocks));
+                alert("✅ นำเข้าข้อมูลสำเร็จ! ระบบจะทำการโหลดหน้าเว็บใหม่");
+                location.reload();
+            } catch (error) { alert("❌ เกิดข้อผิดพลาด! ไฟล์ข้อมูลไม่ถูกต้องหรือไม่สามารถอ่านได้"); }
+        };
+        reader.readAsText(file);
+        event.target.value = ''; 
+    }
+
+    function updateHistDropdowns() {
+        let ls = document.getElementById('lateShiftHist').value;
+        for (let i = 0; i < 4; i++) {
+            let sel = document.getElementById('pattern' + i);
+            let val = sel.value || (i === 0 ? "3" : (i-1).toString());
+            sel.innerHTML = `<option value="0">M ${ls} O O</option><option value="1">${ls} O O M</option><option value="2">O O M ${ls}</option><option value="3">O M ${ls} O</option>`;
+            sel.value = val;
+        }
+    }
+
+    function updateNames() {
+        for(let i=0; i<4; i++) persons[i] = document.getElementById('name'+i).value || `P${i+1}`;
+        localStorage.setItem('shiftPersons', JSON.stringify(persons));
+        updatePreview(); renderSavedHistoryTables(); updateLockTableUI();
+    }
+
+    function updatePreview() {
+        let baseH = buildBaseHistory(historyBlocks);
+        let stats = calculateStats(baseH, historyBlocks);
+        renderTable('histPersonTable', baseH, stats); 
+        renderPairMatrix('histPairMatrixContainer', stats);
+    }
+
+    function addHistoryMonth() {
+        let m = parseInt(document.getElementById('inputMonth').value);
+        let y = parseInt(document.getElementById('inputYear').value);
+        let ls = document.getElementById('lateShiftHist').value;
+        let offsets =[0,1,2,3].map(i => parseInt(document.getElementById('pattern'+i).value));
+        if (new Set(offsets).size !== 4) return alert("รูปแบบเวรซ้ำกัน โปรดเลือกให้ต่างกันครับ!");
+
+        historyBlocks.push({ m, y, days: new Date(y, m, 0).getDate(), offsets, lateShift: ls });
+        localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
+        
+        let nm = m + 1, ny = y; if(nm > 12) { nm=1; ny++; }
+        
+        document.getElementById('inputYear').value = ny;
+        document.getElementById('lockYear').value = ny;
+        populateMonthSelect('inputMonth', 'inputYear');
+        populateMonthSelect('lockMonth', 'lockYear');
+        document.getElementById('inputMonth').value = nm;
+        document.getElementById('lockMonth').value = nm;
+        
+        let lastDays = new Date(y, m, 0).getDate();
+        for(let i=0; i<4; i++) document.getElementById('pattern'+i).value = (lastDays + offsets[i]) % 4;
+
+        renderHistoryBadges(); updatePreview(); renderSavedHistoryTables(); updateLockTableUI();
+    }
+
+    function undoHistoryMonth() { historyBlocks.pop(); localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks)); location.reload(); }
+
+    function renderHistoryBadges() {
+        const c = document.getElementById('historyBadgesContainer');
+        c.innerHTML = '';
+        historyBlocks.forEach(b => {
+            let fullText = getFullMonthText(b.m, b.y);
+            // แสดงเป็น (MA) หรือ (MN)
+            c.innerHTML += `<div class="history-badge">✔️ ${fullText} <span style="color:var(--primary); font-weight:700;">(M${b.lateShift})</span></div>`;
+        });
+        document.getElementById('historyCountStr').innerText = historyBlocks.length + " เดือน";
+    }
+
+    function generateExcelStyleHTML(m, y, days, ls, historySnap, isFuture, monthKeyForLocks) {
+        let tableId = `tbl-${isFuture?'f':'h'}-${y}-${m}`;
+        let headerText = getFullMonthText(m, y);
+        let borderColor = isFuture ? 'var(--success)' : 'var(--primary)';
+        
+        let html = `
+        <div class="card table-responsive" style="border-top: none; border-left: 5px solid ${borderColor}; padding: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin:0; font-size: 16px; display: flex; align-items: center; gap: 8px; color: var(--text-main);">
+                    📅 ${headerText} <span style="font-size: 14px; color: var(--text-muted); font-weight: 600;">(M${ls})</span>
+                </h3>
+                <button class="btn-success" style="width: auto; padding: 6px 14px; font-size: 12px; border-radius: 6px;" onclick="copyTableToExcel('${tableId}')">📋 Copy</button>
+            </div>
+            <table id="${tableId}" class="excel-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="width: 80px;">NAME</th>
+                        <th rowspan="2" style="width: 30px;">Type</th>`;
+                        
+        for (let d = 1; d <= days; d++) {
+            let dateObj = new Date(y, m - 1, d);
+            let dayIdx = dateObj.getDay();
+            let colorStyle = (dayIdx === 0 || dayIdx === 6) ? 'color: red; font-weight: bold;' : '';
+            html += `<th style="${colorStyle} width: 25px;">${dayNames[dayIdx]}</th>`;
+        }
+        html += `<th rowspan="2" style="width: 40px;">Total</th></tr><tr>`;
+        
+        for (let d = 1; d <= days; d++) {
+            let dateObj = new Date(y, m - 1, d);
+            let dayIdx = dateObj.getDay();
+            let colorStyle = (dayIdx === 0 || dayIdx === 6) ? 'color: red; font-weight: bold;' : '';
+            html += `<th style="${colorStyle}">${d}</th>`;
+        }
+        html += `</tr></thead><tbody>`;
+
+        persons.forEach((p, i) => {
+            let startIndex = historySnap[i].length - days;
+            let totalHours = 0;
+            for(let d=0; d<days; d++) { if(historySnap[i][startIndex+d] !== 'O') totalHours += 12; }
+
+            html += `<tr>
+                <td rowspan="2" style="vertical-align: middle;"><b>${p}</b></td>
+                <td>R</td>`;
+            for(let d=0; d<days; d++) {
+                let s = historySnap[i][startIndex+d];
+                let displayShift = s === 'O' ? 'OS1' : s; 
+                let cellStyle = '';
+                if(s === 'M') cellStyle = 'background-color: #FFE699;'; 
+                else if(s !== 'O') cellStyle = 'background-color: #B4C6E7;'; 
+                
+                let lockIconHTML = '';
+                if (isFuture && monthKeyForLocks) {
+                    if (allLocks[monthKeyForLocks] && allLocks[monthKeyForLocks][i] && allLocks[monthKeyForLocks][i][d+1]) {
+                        lockIconHTML = '<span class="lock-icon" style="color: #059669; font-weight: normal; font-size: 10px;"> 🔒</span>'; 
+                        cellStyle += ' font-weight: bold; color: #059669;'; 
+                    }
+                }
+                html += `<td style="${cellStyle}">${displayShift}${lockIconHTML}</td>`;
+            }
+            html += `<td></td></tr><tr><td>W</td>`;
+            for(let d=0; d<days; d++) {
+                let s = historySnap[i][startIndex+d];
+                html += `<td>${s !== 'O' ? '12' : ''}</td>`;
+            }
+            html += `<td style="font-weight:bold;">${totalHours}</td></tr>`;
+        });
+        
+        html += `</tbody></table></div>`;
+        return html;
+    }
+
+    function renderSavedHistoryTables() {
+        const container = document.getElementById('savedHistoryTablesContainer');
+        container.innerHTML = '';
+        historyBlocks.forEach(b => {
+            let pat =['M', b.lateShift, 'O', 'O'];
+            let snap = {0:[], 1:[], 2:[], 3:[]};
+            for(let i=0; i<4; i++) for(let d=0; d<b.days; d++) snap[i].push(pat[(d+b.offsets[i])%4]);
+            container.innerHTML += generateExcelStyleHTML(b.m, b.y, b.days, b.lateShift, snap, false, null);
+        });
+    }
+
+    function renderFinalTables(res) {
+        const c = document.getElementById('monthlyTables'); c.innerHTML = '';
+        res.forEach(r => {
+            let mk = `${r.y}-${String(r.m).padStart(2,'0')}`;
+            c.innerHTML += generateExcelStyleHTML(r.m, r.y, r.days, r.ls, r.historySnapshot, true, mk);
+        });
+    }
+
+    function updateLockTableUI() {
+        let m = parseInt(document.getElementById('lockMonth').value), y = parseInt(document.getElementById('lockYear').value);
+        let days = new Date(y, m, 0).getDate(), monthKey = `${y}-${String(m).padStart(2, '0')}`;
+        let html = `<table class="excel-table"><thead><tr><th style="width: 100px;">ชื่อพนักงาน</th>`;
+        for(let d=1; d<=days; d++) {
+            let isWeekend = (new Date(y, m - 1, d).getDay() % 6 === 0);
+            html += `<th style="${isWeekend ? 'color: red;' : ''} width: 25px;">${d}</th>`;
+        }
+        html += `</tr></thead><tbody>`;
+        persons.forEach((p, i) => {
+            html += `<tr><td style="text-align: left; padding-left: 10px;"><b>${p}</b></td>`;
+            for(let d=1; d<=days; d++) {
+                let s = (allLocks[monthKey] && allLocks[monthKey][i]) ? allLocks[monthKey][i][d] : '';
+                html += `<td onclick="toggleLock('${monthKey}',${i},${d})" class="clickable-cell ${s?'locked-cell shift-'+s:'shift-None'}">${s||'-'}</td>`;
+            }
+            html += `</tr>`;
+        });
+        document.getElementById('lockUiContainer').innerHTML = html + `</tbody></table>`;
+    }
+
+    function toggleLock(mk, p, d) {
+        const ls = document.getElementById('lateShiftFuture').value;
+        const cycle =['', 'M', ls, 'O'];
+        if(!allLocks[mk]) allLocks[mk] = {}; 
+        if(!allLocks[mk][p]) allLocks[mk][p] = {};
+        
+        let cur = allLocks[mk][p][d] || '';
+        let nxt = cycle[(cycle.indexOf(cur)+1)%4];
+
+        if(!nxt) { delete allLocks[mk][p][d]; } else {
+            if(nxt !== 'O') for(let i=0; i<4; i++) if(i !== p && allLocks[mk][i] && allLocks[mk][i][d] === nxt) delete allLocks[mk][i][d];
+            allLocks[mk][p][d] = nxt;
+            let pat =['M', ls, 'O', 'O'], isPossible = false;
+            for(let off=0; off<4; off++) {
+                let valid = true;
+                for(let day in allLocks[mk][p]) if(pat[(parseInt(day)-1+off)%4] !== allLocks[mk][p][day]) { valid = false; break; }
+                if(valid) { isPossible = true; break; }
+            }
+            if(!isPossible) allLocks[mk][p] = {[d]: nxt};
+        }
+        localStorage.setItem('shiftLocksJSON', JSON.stringify(allLocks)); updateLockTableUI();
+    }
+
+    function clearLocksForMonth() {
+        let m = parseInt(document.getElementById('lockMonth').value), y = parseInt(document.getElementById('lockYear').value);
+        delete allLocks[`${y}-${String(m).padStart(2, '0')}`];
+        localStorage.setItem('shiftLocksJSON', JSON.stringify(allLocks)); updateLockTableUI();
+    }
+
+    function clearAllLocks() {
+        if(confirm("คุณแน่ใจหรือไม่ที่จะล้างการล็อคเวร 'ทั้งหมด' ของทุกเดือน?")) {
+            allLocks = {};
+            localStorage.removeItem('shiftLocksJSON');
+            updateLockTableUI();
+        }
+    }
+
+    const getDaysInMonth = (year, month) => new Date(year, month, 0).getDate();
+    function buildBaseHistory(blocks) {
+        let h = {0:[], 1:[], 2:[], 3:[]};
+        blocks.forEach(b => {
+            let pat =['M', b.lateShift, 'O', 'O'];
+            for(let d=0; d<b.days; d++)[0,1,2,3].forEach(i => h[i].push(pat[(d+b.offsets[i])%4]));
+        });
+        return h;
+    }
+
+    function calculateStats(h, blocks) {
+        let s = {workDays:{0:0,1:0,2:0,3:0}, firstDayM:{0:0,1:0,2:0,3:0}, pairs:{}};
+        for(let i=0; i<4; i++) for(let j=0; j<4; j++) if(i!==j) s.pairs[`${i},${j}`] = 0;
+        if(h[0].length === 0) return s;
+        for(let d=0; d<h[0].length; d++) {
+            let mPerson = -1, latePerson = -1;[0,1,2,3].forEach(i => { 
+                if(h[i][d] === 'M') { mPerson = i; s.workDays[i]++; } else if(h[i][d] !== 'O') { latePerson = i; s.workDays[i]++; }
+            });
+            if(mPerson !== -1 && latePerson !== -1) s.pairs[`${mPerson},${latePerson}`]++;
+        }
+        blocks.forEach(b => { let pat =['M', b.lateShift, 'O', 'O'];[0,1,2,3].forEach(i => { if(pat[b.offsets[i]%4]==='M') s.firstDayM[i]++; }); });
+        return s;
+    }
+
+    function getVariance(obj) {
+        let v = Object.values(obj); if(!v.length) return 0;
+        let m = v.reduce((a,b)=>a+b,0)/v.length; return v.reduce((a,b)=>a+Math.pow(b-m,2),0)/v.length;
+    }
+
+    // ฟังก์ชันหาค่าเบี่ยงเบนมาตรฐาน เพื่อให้สเกลตัวเลขสมดุลกว่า Variance
+    function getStdDev(obj) {
+        let v = Object.values(obj); if(!v.length) return 0;
+        let m = v.reduce((a,b)=>a+b,0)/v.length;
+        let variance = v.reduce((a,b)=>a+Math.pow(b-m,2),0)/v.length;
+        return Math.sqrt(variance);
+    }
+
+    const getStreakCounts = (historyArray) => {
+        let workInst = 0, offInst = 0, wStreak = 0, oStreak = 0;
+        for (let s of historyArray) {
+            if (s !== 'O') { wStreak++; if(oStreak >= 3) offInst++; oStreak=0; } else { oStreak++; if(wStreak >= 3) workInst++; wStreak=0; }
+        }
+        if (oStreak >= 3) offInst++; if (wStreak >= 3) workInst++;
+        return { workInst, offInst };
+    };
+
+    function scoreCandidate(off, m, y, currentStats, pat, currentHist) {
+        let days = getDaysInMonth(y, m);
+        let simStats = { workDays: {...currentStats.workDays}, pairs: {...currentStats.pairs} };
+        let simFirstDayM = {...currentStats.firstDayM};
+        for(let i=0; i<4; i++) if(pat[off[i]%4]==='M') simFirstDayM[i]++;
+        
+        let simHistoryForStreak = {0:[], 1:[], 2:[], 3:[]};
+        for(let d=0; d<days; d++) {
+            let mPerson = -1, latePerson = -1;
+            for(let i=0; i<4; i++) {
+                let s = pat[(d+off[i])%4]; simHistoryForStreak[i].push(s);
+                if(s === 'M') { mPerson = i; simStats.workDays[i]++; } 
+                else if(s !== 'O') { latePerson = i; simStats.workDays[i]++; }
+            }
+            if(mPerson !== -1 && latePerson !== -1) simStats.pairs[`${mPerson},${latePerson}`]++;
+        }
+        
+        let simStreaks = {work:{}, off:{}};
+        let hardPenalty = 0; // ตัวแปรเก็บคะแนนลงโทษ
+        
+        for(let i=0; i<4; i++) {
+            let fullHist = currentHist[i].concat(simHistoryForStreak[i]);
+            let strk = getStreakCounts(fullHist);
+            simStreaks.work[i] = strk.workInst; 
+            simStreaks.off[i] = strk.offInst;
+
+            // --- เพิ่มกฎเหล็ก (Hard Penalty) ---
+            let currentWorkStreak = 0;
+            // เช็คการทำเวรติดกัน ห้ามเกิน 4 วัน
+            for(let s of fullHist.slice(-10)) { 
+                if (s !== 'O') {
+                    currentWorkStreak++;
+                    if (currentWorkStreak > 4) hardPenalty += 2000; 
+                } else {
+                    currentWorkStreak = 0;
+                }
+            }
+        }
+
+        // --- คำนวณคะแนนด้วย Standard Deviation และระบบถ่วงน้ำหนักใหม่ ---
+        return hardPenalty + 
+               (getStdDev(simStats.workDays) * 200) +   // #1 ยังให้ชั่วโมงรวมสำคัญที่สุด
+               (getStdDev(simStreaks.work) * 100) +     // [ปรับเพิ่ม] บังคับ 'ทำติด 3 วัน' ให้เฉลี่ยเท่าๆ กัน
+               (getStdDev(simStreaks.off) * 100) +      // [ปรับเพิ่ม] บังคับ 'หยุดติด 3 วัน' ให้เฉลี่ยเท่าๆ กัน
+               (getStdDev(simFirstDayM) * 100) +        // [ปรับเพิ่ม] บังคับ 'M วันที่ 1' ให้เฉลี่ยเท่าๆ กัน
+               (getStdDev(simStats.pairs) * 10);        // ให้การจับคู่เวรยอมยืดหยุ่นได้
+    }
+
+    async function generateFutureSchedule() {
+        if(historyBlocks.length === 0) return alert("กรุณาใส่ประวัติอย่างน้อย 1 เดือนก่อนครับ");
+        document.getElementById('resultStatus').innerHTML = "⏳ กำลังประมวลผล...";
+        document.getElementById('resultStatus').style.color = "var(--warning)";
+        document.getElementById('outputSection').style.display = 'block';
+        document.getElementById('rosterActionContainer').style.display = 'none';
+        
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        const perms = getPermutations([0,1,2,3]);
+        const MAX_BRANCHES = 6; 
+
+        function miniSolve(m, y, currentStats, currentHist, depth, maxDepth) {
+            let works = Object.values(currentStats.workDays);
+            let isHoursEqual = works.length > 0 && works.every(val => val === works[0]);
+            if (isHoursEqual && depth > 0) return true;
+            if (depth >= maxDepth) return false;
+
+            let days = getDaysInMonth(y, m);
+            let ls = document.getElementById('lateShiftFuture').value, pat = ['M', ls, 'O', 'O'];
+            let candidates = perms.filter(off => {
+                for(let i=0; i<4; i++) {
+                    let prev = currentHist[i][currentHist[i].length-1];
+                    if((prev==='N'||prev==='A') && pat[off[i]%4]==='M') return false;
+                }
+                return true;
+            });
+            candidates.sort((a, b) => scoreCandidate(a, m, y, currentStats, pat, currentHist) - scoreCandidate(b, m, y, currentStats, pat, currentHist));
+            
+            candidates = candidates.slice(0, MAX_BRANCHES);
+
+            for (let off of candidates) {
+                let newH = {0:[...currentHist[0]], 1:[...currentHist[1]], 2:[...currentHist[2]], 3:[...currentHist[3]]};
+                let newS = {workDays:{...currentStats.workDays}, firstDayM:{...currentStats.firstDayM}, pairs:{...currentStats.pairs}};
+                for(let d=0; d<days; d++) {
+                    [0,1,2,3].forEach(i => {
+                        let s = pat[(d+off[i])%4]; newH[i].push(s);
+                        if(s === 'M') newS.workDays[i]++; else if(s !== 'O') newS.workDays[i]++;
+                    });
+                }
+                let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
+                if(miniSolve(nextM, nextY, newS, newH, depth + 1, maxDepth)) return true;
+            }
+            return false;
+        }
+
+        function executeSolveExact(targetMonths, requireFutureProof) {
+            let last = historyBlocks[historyBlocks.length-1];
+            let curM = last.m + 1, curY = last.y; if(curM > 12){ curM=1; curY++; }
+            
+            let targetM = curM - 1, targetY = curY; 
+            for (let mk in allLocks) {
+                let [ly, lm] = mk.split('-'); ly = parseInt(ly); lm = parseInt(lm);
+                if (ly > curY || (ly === curY && lm >= curM)) { if (ly > targetY || (ly === targetY && lm > targetM)) { targetY = ly; targetM = lm; } }
+            }
+
+            let results = [], baseH = buildBaseHistory(historyBlocks), baseS = calculateStats(baseH, historyBlocks);
+
+            function solve(m, y, currentStats, currentHist, depth) {
+                let works = Object.values(currentStats.workDays);
+                let isHoursEqual = works.length > 0 && works.every(val => val === works[0]);
+                let passedTarget = (y > targetY || (y === targetY && m > targetM));
+
+                if (depth === targetMonths) {
+                    if (passedTarget && isHoursEqual) {
+                        if (requireFutureProof) {
+                            let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
+                            return miniSolve(nextM, nextY, currentStats, currentHist, 0, 3);
+                        }
+                        return true;
+                    }
+                    return false;
+                }
+                if (depth > targetMonths) return false;
+
+                let mk = `${y}-${String(m).padStart(2, '0')}`, days = getDaysInMonth(y, m);
+                let ls = document.getElementById('lateShiftFuture').value, pat = ['M', ls, 'O', 'O'];
+
+                let candidates = perms.filter(off => {
+                    for(let i=0; i<4; i++) {
+                        let prev = currentHist[i][currentHist[i].length-1];
+                        if((prev==='N'||prev==='A') && pat[off[i]%4]==='M') return false;
+                    }
+                    if(allLocks[mk]) {
+                        for(let i=0; i<4; i++) if(allLocks[mk][i]) {
+                            for(let d in allLocks[mk][i]) if(pat[(parseInt(d)-1+off[i])%4] !== allLocks[mk][i][d]) return false;
+                        }
+                    }
+                    return true;
+                });
+
+                candidates.sort((a, b) => scoreCandidate(a, m, y, currentStats, pat, currentHist) - scoreCandidate(b, m, y, currentStats, pat, currentHist));
+                
+                candidates = candidates.slice(0, MAX_BRANCHES);
+
+                for (let off of candidates) {
+                    let newH = {0:[...currentHist[0]], 1:[...currentHist[1]], 2:[...currentHist[2]], 3:[...currentHist[3]]};
+                    let newS = {workDays:{...currentStats.workDays}, firstDayM:{...currentStats.firstDayM}, pairs:{...currentStats.pairs}};
+                    for(let i=0; i<4; i++) if(pat[off[i]%4]==='M') newS.firstDayM[i]++;
+                    
+                    for(let d=0; d<days; d++) {
+                        let mPerson = -1, latePerson = -1; [0,1,2,3].forEach(i => {
+                            let s = pat[(d+off[i])%4]; newH[i].push(s);
+                            if(s === 'M') { mPerson = i; newS.workDays[i]++; } else if(s !== 'O') { latePerson = i; newS.workDays[i]++; }
+                        });
+                        if(mPerson !== -1 && latePerson !== -1) newS.pairs[`${mPerson},${latePerson}`]++;
+                    }
+                    let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
+                    if(solve(nextM, nextY, newS, newH, depth + 1)) {
+                        results.push({m, y, days, off, ls, historySnapshot: JSON.parse(JSON.stringify(newH)), statsAtEnd: newS});
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            if (solve(curM, curY, baseS, baseH, 0)) {
+                return results.reverse();
+            }
+            return null;
+        }
+
+        let maxSearchLimit = 12; 
+        let finalRes = null;
+
+        for (let targetFutureMonths = 1; targetFutureMonths <= maxSearchLimit; targetFutureMonths++) {
+            let resNormal = executeSolveExact(targetFutureMonths, true);
+            if (resNormal) {
+                finalRes = resNormal;
+                break;
+            }
+        }
+
+        if (!finalRes) {
+            for (let targetFutureMonths = 1; targetFutureMonths <= maxSearchLimit; targetFutureMonths++) {
+                let resNormal = executeSolveExact(targetFutureMonths, false);
+                if (resNormal) { 
+                    finalRes = resNormal; 
+                    break; 
+                }
+            }
+        }
+
+        if (finalRes) {
+            let lastRes = finalRes[finalRes.length-1];
+            let works = Object.values(lastRes.statsAtEnd.workDays);
+            let isPerfect = works.every(val => val === works[0]);
+
+            window.generatedRoster = finalRes; 
+            document.getElementById('rosterActionContainer').style.display = 'flex'; 
+
+            let statusHTML = "";
+
+            if (isPerfect) {
+                statusHTML = `✅ จัด Roster สำเร็จ! (ล่วงหน้า ${finalRes.length} เดือน)`;
+                document.getElementById('resultStatus').style.color = "var(--success)";
+            } else {
+                statusHTML = `⚠️ จัดผ่านวันล็อคสำเร็จ! แต่ชนขีดจำกัดสูงสุด ${finalRes.length} เดือน (ชั่วโมงอาจไม่เท่ากันเป๊ะ)`;
+                document.getElementById('resultStatus').style.color = "var(--warning)";
+            }
+
+            document.getElementById('resultStatus').innerHTML = statusHTML;
+            renderTable('finalPersonTable', lastRes.historySnapshot, lastRes.statsAtEnd);
+            renderPairMatrix('finalPairMatrixContainer', lastRes.statsAtEnd);
+            renderFinalTables(finalRes);
+        } else {
+            window.generatedRoster = [];
+            document.getElementById('resultStatus').innerHTML = "❌ ไม่สามารถจัดได้: วันที่ล็อคอาจขัดแย้งกับกฎ หรือไม่สามารถหาทางลงตัวได้ภายใน 12 เดือน";
+            document.getElementById('resultStatus').style.color = "var(--danger)";
+        }
+    }
+
+    function commitRosterToHistory() {
+        if(!window.generatedRoster || window.generatedRoster.length === 0) return;
+        if(confirm(`ยืนยันการบันทึกตารางเวรที่จัดสำเร็จแล้วทั้ง ${window.generatedRoster.length} เดือน ลงในประวัติย้อนหลังหรือไม่?\n\n*ระบบจะทำการโหลดหน้าจอใหม่หลังบันทึกเสร็จสิ้น`)) {
+            window.generatedRoster.forEach(r => {
+                historyBlocks.push({ m: r.m, y: r.y, days: r.days, offsets: r.off, lateShift: r.ls });
+            });
+            localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
+            alert("✅ เพิ่มไปยังประวัติเวรเรียบร้อยแล้ว!");
+            location.reload();
+        }
+    }
+
+    function renderTable(id, histObj, s) {
+        const tbody = document.querySelector(`#${id} tbody`); tbody.innerHTML = '';
+        persons.forEach((p, i) => {
+            let streaks = getStreakCounts(histObj[i] ||[]);
+            // ปรับแต่งแถวให้ตัวอักษรเป็นตัวหนาทั้งหมด (bold)
+            tbody.innerHTML += `<tr style="font-weight: bold;">
+                <td style="text-align: left; padding-left: 10px;">${p}</td>
+                <td>${s.workDays[i]*12}</td>
+                <td>${streaks.workInst}</td>
+                <td>${streaks.offInst}</td>
+                <td>${s.firstDayM[i]}</td>
+            </tr>`;
+        });
+    }
+
+    function renderPairMatrix(id, s) {
+        let html = '<table class="matrix-table"><thead><tr><th>M \\ A,N</th>';
+        persons.forEach(p => html += `<th>${p.substring(0,3)}</th>`);
+        // ปรับแต่งเนื้อหาตารางให้เป็นตัวหนา
+        html += '</tr></thead><tbody style="font-weight: bold;">';
+        persons.forEach((p, i) => {
+            html += `<tr><td>${p.substring(0,3)}</td>`;
+            persons.forEach((p2, j) => {
+                if(i === j) html += '<td style="background:var(--bg); color: var(--text-muted);">-</td>';
+                else html += `<td>${s.pairs[`${i},${j}`]||0}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        document.getElementById(id).innerHTML = html;
+    }
+
+    function getPermutations(arr) {
+        if (arr.length <= 1) return [arr];
+        let res =[];
+        for (let i = 0; i < arr.length; i++) {
+            let rest = getPermutations([...arr.slice(0, i), ...arr.slice(i + 1)]);
+            rest.forEach(p => res.push([arr[i], ...p]));
+        }
+        return res;
+    }
+
+    function clearDatabase() { if(confirm("ล้างข้อมูลทั้งหมด? การตั้งค่าและประวัติจะหายทั้งหมด")) { localStorage.clear(); location.reload(); } }
+</script>
+
+</body>
+</html>
