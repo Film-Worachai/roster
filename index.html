@@ -133,6 +133,20 @@
         .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .action-group { display: flex; gap: 10px; flex-wrap: wrap; }
 
+        /* ปุ่ม Scroll ลอย */
+        .fab-container { 
+            position: fixed; bottom: 20px; right: 20px; 
+            display: flex; flex-direction: column; gap: 10px; z-index: 1000; 
+        }
+        .fab-btn { 
+            width: 44px; height: 44px; border-radius: 50%; 
+            background: var(--card); border: 2px solid var(--border); 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); cursor: pointer; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 18px; color: var(--text-muted); transition: 0.2s; 
+        }
+        .fab-btn:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-3px); }
+
         @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .excel-table { font-size: 11px; } }
     </style>
 </head>
@@ -289,19 +303,28 @@
                 <button class="btn-success" style="width: auto; padding: 10px 20px; font-size: 14px; border-radius: 8px; box-shadow: 0 4px 6px rgba(16,185,129,0.2);" onclick="commitRosterToHistory()">📥 เพิ่มไปยังประวัติเวร</button>
             </div>
 
-            <div class="grid-2 mt-3">
-                <div class="table-responsive"><table id="finalPersonTable"><thead><tr><th>พนักงาน</th><th>ชม.รวม</th><th>ทำติด 3 วัน</th><th>หยุดติด 3 วัน</th><th>M วันที่ 1</th></tr></thead><tbody></tbody></table></div>
-                <div class="table-responsive" id="finalPairMatrixContainer"></div>
+            <div id="finalStatsContainer" style="display: none;">
+                <div class="grid-2 mt-3">
+                    <div class="table-responsive"><table id="finalPersonTable"><thead><tr><th>พนักงาน</th><th>ชม.รวม</th><th>ทำติด 3 วัน</th><th>หยุดติด 3 วัน</th><th>M วันที่ 1</th></tr></thead><tbody></tbody></table></div>
+                    <div class="table-responsive" id="finalPairMatrixContainer"></div>
+                </div>
             </div>
+
         </div>
         <div id="monthlyTables"></div>
     </div>
+</div>
+
+<div class="fab-container">
+    <button class="fab-btn" onclick="window.scrollTo({ top: 0, behavior: 'smooth' })" title="เลื่อนขึ้นบนสุด">⬆️</button>
+    <button class="fab-btn" onclick="window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })" title="เลื่อนลงล่างสุด">⬇️</button>
 </div>
 
 <script>
     const monthNamesTH =["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
     const monthNamesEN =["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const dayNames =['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const monthNamesTHShort = ["", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 
     let persons =['KOMKRIT', 'NATTHAPOL', 'KONCHANOK', 'WORACHAI'];
     let historyBlocks =[]; 
@@ -328,6 +351,12 @@
         let be = parseInt(y) + 543;
         let mm = String(m).padStart(2, '0');
         return `${mm} ${monthNamesTH[m]} พ.ศ. ${be} ${monthNamesEN[m]} ${y}`;
+    }
+
+    // ฟังก์ชันใหม่สำหรับเดือนและปีแบบย่อ (เช่น ต.ค. 68)
+    function getShortMonthText(m, y) {
+        let be = parseInt(y) + 543;
+        return `${monthNamesTHShort[m]} ${String(be).slice(-2)}`;
     }
 
     function populateMonthSelect(selectId, yearId) {
@@ -529,12 +558,13 @@
         refreshAllViews();
     }
 
+    // แก้ไขให้ดึงเดือนปีแบบย่อมาแสดง
     function renderHistoryBadges() {
         const c = document.getElementById('historyBadgesContainer');
         c.innerHTML = '';
         historyBlocks.forEach(b => {
-            let fullText = getFullMonthText(b.m, b.y);
-            c.innerHTML += `<div class="history-badge">✔️ ${fullText} <span style="color:var(--primary); font-weight:700;">(M${b.lateShift})</span></div>`;
+            let shortText = getShortMonthText(b.m, b.y);
+            c.innerHTML += `<div class="history-badge">✔️ ${shortText} <span style="color:var(--primary); font-weight:700;">(M${b.lateShift})</span></div>`;
         });
         document.getElementById('historyCountStr').innerText = historyBlocks.length + " เดือน";
     }
@@ -733,7 +763,6 @@
         return h;
     }
 
-    // เพิ่มการนับ lateShifts เบื้องหลัง 
     function calculateStats(h, blocks) {
         let s = {workDays:{0:0,1:0,2:0,3:0}, firstDayM:{0:0,1:0,2:0,3:0}, pairs:{}, lateShifts:{0:0,1:0,2:0,3:0}};
         for(let i=0; i<4; i++) for(let j=0; j<4; j++) if(i!==j) s.pairs[`${i},${j}`] = 0;
@@ -746,7 +775,7 @@
                 else if(shift !== 'O') { 
                     latePerson = i; 
                     s.workDays[i]++; 
-                    s.lateShifts[i]++; // นับจำนวนกะดึก
+                    s.lateShifts[i]++; 
                 }
             }
             if(mPerson !== -1 && latePerson !== -1) s.pairs[`${mPerson},${latePerson}`]++;
@@ -774,7 +803,6 @@
         const tbody = document.querySelector(`#${id} tbody`); tbody.innerHTML = '';
         persons.forEach((p, i) => {
             let streaks = getStreakCounts(histObj[i] ||[]);
-            // ไม่เอา lateShifts มาแสดงในตาราง ตามที่ Request มา
             tbody.innerHTML += `<tr style="font-weight: bold;">
                 <td style="text-align: left; padding-left: 10px;">${escapeHTML(p)}</td>
                 <td>${s.workDays[i]*12}</td>
@@ -820,7 +848,6 @@
         self.onmessage = function(e) {
             const { historyBlocks, allLocks, lsFuture, maxSearchLimit } = e.data;
 
-            // --- Helper Functions in Worker ---
             const getDaysInMonth = (year, month) => new Date(year, month, 0).getDate();
             
             function buildBaseHistory(blocks) {
@@ -847,7 +874,7 @@
                         else if(shift !== 'O') { 
                             latePerson = i; 
                             s.workDays[i]++; 
-                            s.lateShifts[i]++; // นับจำนวนกะดึก 
+                            s.lateShifts[i]++;  
                         }
                     }
                     if(mPerson !== -1 && latePerson !== -1) s.pairs[mPerson+','+latePerson]++;
@@ -907,7 +934,7 @@
                         else if(s !== 'O') { 
                             latePerson = i; 
                             simStats.workDays[i]++; 
-                            simStats.lateShifts[i]++; // จำลองการเพิ่มกะดึก 
+                            simStats.lateShifts[i]++; 
                         }
                     }
                     if(mPerson !== -1 && latePerson !== -1) simStats.pairs[mPerson+','+latePerson]++;
@@ -934,17 +961,15 @@
                     }
                 }
 
-                // นำคะแนนความแปรปรวนของกะดึก (StdDev of lateShifts) มาใช้พิจารณาด้วยน้ำหนักระดับสูง (x200)
                 return hardPenalty + 
-                       (getStdDev(simStats.workDays) * 300) +     // เพิ่มน้ำหนักชั่วโมงรวมให้สำคัญที่สุด
-                       (getStdDev(simStats.lateShifts) * 100) +   // ตรวจสอบความยุติธรรมของการกระจายกะดึก
+                       (getStdDev(simStats.workDays) * 300) +     
+                       (getStdDev(simStats.lateShifts) * 100) +   
                        (getStdDev(simStreaks.work) * 100) +     
                        (getStdDev(simStreaks.off) * 100) +      
                        (getStdDev(simFirstDayM) * 100) +        
                        (getStdDev(simStats.pairs) * 10);        
             }
 
-            // --- Algorithm Core ---
             const perms = getPermutations([0,1,2,3]);
             const MAX_BRANCHES = 6; 
 
@@ -1113,6 +1138,9 @@
         document.getElementById('outputSection').style.display = 'block';
         document.getElementById('rosterActionContainer').style.display = 'none';
         
+        // ซ่อนกรอบตารางหัวตารางระหว่างที่กำลังโหลดรอผล
+        document.getElementById('finalStatsContainer').style.display = 'none';
+        
         document.getElementById('monthlyTables').innerHTML = '';
         document.getElementById('finalPersonTable').querySelector('tbody').innerHTML = '';
         document.getElementById('finalPairMatrixContainer').innerHTML = '';
@@ -1141,6 +1169,9 @@
 
                 window.generatedRoster = finalRes; 
                 document.getElementById('rosterActionContainer').style.display = 'flex'; 
+
+                // แสดงกรอบตารางหลังจากโหลดผลสำเร็จแล้ว
+                document.getElementById('finalStatsContainer').style.display = 'block';
 
                 let statusHTML = "";
 
