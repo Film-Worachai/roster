@@ -154,7 +154,7 @@
 
 <div class="container">
     <div class="header">
-        <h1>🏥 จัด Roster</h1>
+        <h1>🏥 ROSTER</h1>
     </div>
 
     <div class="card" style="border-top: 5px solid var(--primary);">
@@ -292,7 +292,7 @@
             <div id="lockUiContainer" class="table-responsive" style="border: 1px solid var(--border);"></div>
         </div>
 
-        <button id="generateBtn" class="btn-success mt-3" onclick="generateFutureSchedule()">🚀 จัด Roster</button>
+        <button id="generateBtn" class="btn-success mt-3" onclick="generateFutureSchedule()">🚀 จัด ROSTER</button>
     </div>
 
     <div id="outputSection">
@@ -1232,7 +1232,7 @@
                 let statusHTML = "";
 
                 if (isPerfect) {
-                    statusHTML = `✅ จัด Roster สำเร็จ! (ล่วงหน้า ${finalRes.length} เดือน)`;
+                    statusHTML = `✅ จัด ROSTER สำเร็จ! (ล่วงหน้า ${finalRes.length} เดือน)`;
                     document.getElementById('resultStatus').style.color = "var(--success)";
                 } else {
                     statusHTML = `⚠️ จัดผ่านวันล็อคสำเร็จ! แต่ชนขีดจำกัดสูงสุด ${finalRes.length} เดือน (ชั่วโมงอาจไม่เท่ากันเป๊ะ)`;
