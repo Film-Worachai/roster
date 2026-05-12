@@ -1009,6 +1009,7 @@
                     for(let j = startIdx; j < fullHist.length; j++) { 
                         if (fullHist[j] !== 'O') {
                             currentWorkStreak++;
+
                             if (currentWorkStreak > 3) hardPenalty += 5000; 
                         } else {
                             currentWorkStreak = 0;
@@ -1018,18 +1019,18 @@
 
                 return hardPenalty + 
                        (getStdDev(simStats.workDays) * 1500) +    // ล็อคชั่วโมงรวมให้เท่ากัน (สำคัญอันดับ 1)
-                       (getStdDev(simStats.lateShifts) * 800) +   // ล็อคกะดึกให้เท่ากัน (สำคัญอันดับ 2)
+                       (getStdDev(simFirstDayM) * 400) +          // 🌟 อัปเกรด! เพิ่มน้ำหนักการเปิดเดือนด้วย M (ความสำคัญอันดับ 2)
                        (getStdDev(simStreaks.off4) * 600) +       // บังคับให้การกระจาย "หยุด 4 วัน" เท่ากัน
                        (getStdDev(simStreaks.off3) * 400) +       // บังคับให้การกระจาย "หยุด 3 วัน" เท่ากัน
                        (getStdDev(simStreaks.work3) * 400) +      // บังคับให้ทำเวรติด 3 วัน โดนเท่าๆ กัน
-                       (getStdDev(simFirstDayM) * 50) +        
-                       (getStdDev(simStats.pairs) * 10) - 
+                       (getStdDev(simStats.lateShifts) * 10) +    // ⬇️ ลดระดับกะดึก ให้เท่ากับคู่เวร
+                       (getStdDev(simStats.pairs) * 10) -         // คู่เวร
                        (totalOff4Streaks * 800) -                 // 🎯 โบนัสหลัก: หาหยุด 4 วันให้เจอก่อน
                        (totalOff3Streaks * 300);                  // 🎯 โบนัสรอง: ถ้าหา 4 ไม่ได้ ก็เอา 3 วันมาแทน
             }
 
             const perms = getPermutations([0,1,2,3]);
-            const MAX_BRANCHES = 10; 
+            const MAX_BRANCHES = 8; 
 
             function miniSolve(m, y, currentStats, currentHist, depth, maxDepth) {
                 let works = Object.values(currentStats.workDays);
