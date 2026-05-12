@@ -308,7 +308,6 @@
     let allLocks = {};
     window.generatedRoster =[]; 
 
-    // --- ความปลอดภัย ---
     function escapeHTML(str) {
         return String(str).replace(/[&<>'"]/g, tag => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
@@ -349,10 +348,9 @@
         populateMonthSelect(selectId, yearId);
     }
 
-    // --- State-Driven UI Update ---
     function refreshAllViews() {
         initializeUI(); 
-        document.getElementById('outputSection').style.display = 'none'; // ซ่อนตารางจัดเวรเดิมเวลาอัปเดตข้อมูลฐาน
+        document.getElementById('outputSection').style.display = 'none'; 
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -397,7 +395,6 @@
     }
 
     window.onload = async () => {
-        // ใช้ getSafeJSON แทน JSON.parse ตรงๆ
         const isClearedManually = localStorage.getItem('isClearedManually'); 
         
         if (localStorage.getItem('shiftPersons') && localStorage.getItem('shiftHistoryBlocks')) {
@@ -449,7 +446,7 @@
             localStorage.removeItem('isClearedManually');
             
             alert("✅ ดึงข้อมูลสำเร็จ!");
-            refreshAllViews(); // แทน location.reload()
+            refreshAllViews();
         } catch (error) {
             console.warn(error);
             alert("❌ เกิดข้อผิดพลาด: ไม่สามารถดึงข้อมูลจากเซิร์ฟเวอร์ได้");
@@ -481,7 +478,7 @@
                 if (importedData.allLocks) { allLocks = importedData.allLocks; localStorage.setItem('shiftLocksJSON', JSON.stringify(allLocks)); }
                 localStorage.removeItem('isClearedManually');
                 alert("✅ นำเข้าข้อมูลสำเร็จ!");
-                refreshAllViews(); // แทน location.reload()
+                refreshAllViews();
             } catch (error) { alert("❌ เกิดข้อผิดพลาด! ไฟล์ข้อมูลไม่ถูกต้องหรือไม่สามารถอ่านได้"); }
         };
         reader.readAsText(file);
@@ -529,7 +526,7 @@
         if(historyBlocks.length === 0) return;
         historyBlocks.pop(); 
         localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks)); 
-        refreshAllViews(); // แทน location.reload()
+        refreshAllViews();
     }
 
     function renderHistoryBadges() {
@@ -719,7 +716,7 @@
             persons = ['KOMKRIT', 'NATTHAPOL', 'KONCHANOK', 'WORACHAI'];
             historyBlocks = [];
             allLocks = {};
-            refreshAllViews(); // แทน location.reload()
+            refreshAllViews();
         } 
     }
 
@@ -736,15 +733,21 @@
         return h;
     }
 
+    // เพิ่มการนับ lateShifts เบื้องหลัง 
     function calculateStats(h, blocks) {
-        let s = {workDays:{0:0,1:0,2:0,3:0}, firstDayM:{0:0,1:0,2:0,3:0}, pairs:{}};
+        let s = {workDays:{0:0,1:0,2:0,3:0}, firstDayM:{0:0,1:0,2:0,3:0}, pairs:{}, lateShifts:{0:0,1:0,2:0,3:0}};
         for(let i=0; i<4; i++) for(let j=0; j<4; j++) if(i!==j) s.pairs[`${i},${j}`] = 0;
         if(h[0].length === 0) return s;
         for(let d=0; d<h[0].length; d++) {
             let mPerson = -1, latePerson = -1;
             for(let i=0; i<4; i++) { 
-                if(h[i][d] === 'M') { mPerson = i; s.workDays[i]++; } 
-                else if(h[i][d] !== 'O') { latePerson = i; s.workDays[i]++; }
+                let shift = h[i][d];
+                if(shift === 'M') { mPerson = i; s.workDays[i]++; } 
+                else if(shift !== 'O') { 
+                    latePerson = i; 
+                    s.workDays[i]++; 
+                    s.lateShifts[i]++; // นับจำนวนกะดึก
+                }
             }
             if(mPerson !== -1 && latePerson !== -1) s.pairs[`${mPerson},${latePerson}`]++;
         }
@@ -771,6 +774,7 @@
         const tbody = document.querySelector(`#${id} tbody`); tbody.innerHTML = '';
         persons.forEach((p, i) => {
             let streaks = getStreakCounts(histObj[i] ||[]);
+            // ไม่เอา lateShifts มาแสดงในตาราง ตามที่ Request มา
             tbody.innerHTML += `<tr style="font-weight: bold;">
                 <td style="text-align: left; padding-left: 10px;">${escapeHTML(p)}</td>
                 <td>${s.workDays[i]*12}</td>
@@ -805,7 +809,7 @@
             });
             localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
             alert("✅ เพิ่มไปยังประวัติเวรเรียบร้อยแล้ว!");
-            refreshAllViews(); // อัปเดต UI โดยไม่โหลดหน้าใหม่
+            refreshAllViews(); 
         }
     }
 
@@ -816,7 +820,7 @@
         self.onmessage = function(e) {
             const { historyBlocks, allLocks, lsFuture, maxSearchLimit } = e.data;
 
-            // --- Helper Functions (ต้องก็อปปี้เข้ามาไว้ใน Worker เพราะ Worker เข้าถึงข้างนอกไม่ได้) ---
+            // --- Helper Functions in Worker ---
             const getDaysInMonth = (year, month) => new Date(year, month, 0).getDate();
             
             function buildBaseHistory(blocks) {
@@ -832,14 +836,19 @@
             }
 
             function calculateStats(h, blocks) {
-                let s = {workDays:{0:0,1:0,2:0,3:0}, firstDayM:{0:0,1:0,2:0,3:0}, pairs:{}};
+                let s = {workDays:{0:0,1:0,2:0,3:0}, firstDayM:{0:0,1:0,2:0,3:0}, pairs:{}, lateShifts:{0:0,1:0,2:0,3:0}};
                 for(let i=0; i<4; i++) for(let j=0; j<4; j++) if(i!==j) s.pairs[i+','+j] = 0;
                 if(h[0].length === 0) return s;
                 for(let d=0; d<h[0].length; d++) {
                     let mPerson = -1, latePerson = -1;
                     for(let i=0; i<4; i++) { 
-                        if(h[i][d] === 'M') { mPerson = i; s.workDays[i]++; } 
-                        else if(h[i][d] !== 'O') { latePerson = i; s.workDays[i]++; }
+                        let shift = h[i][d];
+                        if(shift === 'M') { mPerson = i; s.workDays[i]++; } 
+                        else if(shift !== 'O') { 
+                            latePerson = i; 
+                            s.workDays[i]++; 
+                            s.lateShifts[i]++; // นับจำนวนกะดึก 
+                        }
                     }
                     if(mPerson !== -1 && latePerson !== -1) s.pairs[mPerson+','+latePerson]++;
                 }
@@ -882,7 +891,8 @@
             function scoreCandidate(off, m, y, currentStats, pat, currentHist, days) {
                 let simStats = { 
                     workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
-                    pairs: Object.assign({}, currentStats.pairs) 
+                    pairs: Object.assign({}, currentStats.pairs),
+                    lateShifts: { 0: currentStats.lateShifts[0], 1: currentStats.lateShifts[1], 2: currentStats.lateShifts[2], 3: currentStats.lateShifts[3] }
                 };
                 let simFirstDayM = { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] };
                 
@@ -894,7 +904,11 @@
                     for(let i=0; i<4; i++) {
                         let s = pat[(d+off[i])%4]; simHistoryForStreak[i].push(s);
                         if(s === 'M') { mPerson = i; simStats.workDays[i]++; } 
-                        else if(s !== 'O') { latePerson = i; simStats.workDays[i]++; }
+                        else if(s !== 'O') { 
+                            latePerson = i; 
+                            simStats.workDays[i]++; 
+                            simStats.lateShifts[i]++; // จำลองการเพิ่มกะดึก 
+                        }
                     }
                     if(mPerson !== -1 && latePerson !== -1) simStats.pairs[mPerson+','+latePerson]++;
                 }
@@ -920,8 +934,10 @@
                     }
                 }
 
+                // นำคะแนนความแปรปรวนของกะดึก (StdDev of lateShifts) มาใช้พิจารณาด้วยน้ำหนักระดับสูง (x200)
                 return hardPenalty + 
-                       (getStdDev(simStats.workDays) * 200) +   
+                       (getStdDev(simStats.workDays) * 300) +     // เพิ่มน้ำหนักชั่วโมงรวมให้สำคัญที่สุด
+                       (getStdDev(simStats.lateShifts) * 100) +   // ตรวจสอบความยุติธรรมของการกระจายกะดึก
                        (getStdDev(simStreaks.work) * 100) +     
                        (getStdDev(simStreaks.off) * 100) +      
                        (getStdDev(simFirstDayM) * 100) +        
@@ -956,13 +972,18 @@
                     let newS = {
                         workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
                         firstDayM: { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] },
-                        pairs: Object.assign({}, currentStats.pairs)
+                        pairs: Object.assign({}, currentStats.pairs),
+                        lateShifts: { 0: currentStats.lateShifts[0], 1: currentStats.lateShifts[1], 2: currentStats.lateShifts[2], 3: currentStats.lateShifts[3] }
                     };
                     
                     for(let d=0; d<days; d++) {
                         for (let i = 0; i < 4; i++) {
                             let s = pat[(d+off[i])%4]; newH[i].push(s);
-                            if(s === 'M') newS.workDays[i]++; else if(s !== 'O') newS.workDays[i]++;
+                            if(s === 'M') { newS.workDays[i]++; } 
+                            else if(s !== 'O') { 
+                                newS.workDays[i]++; 
+                                newS.lateShifts[i]++; 
+                            }
                         }
                     }
                     let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
@@ -1025,7 +1046,8 @@
                         let newS = {
                             workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
                             firstDayM: { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] },
-                            pairs: Object.assign({}, currentStats.pairs)
+                            pairs: Object.assign({}, currentStats.pairs),
+                            lateShifts: { 0: currentStats.lateShifts[0], 1: currentStats.lateShifts[1], 2: currentStats.lateShifts[2], 3: currentStats.lateShifts[3] }
                         };
 
                         for(let i=0; i<4; i++) if(pat[off[i]%4]==='M') newS.firstDayM[i]++;
@@ -1035,7 +1057,11 @@
                             for (let i = 0; i < 4; i++) {
                                 let s = pat[(d+off[i])%4]; newH[i].push(s);
                                 if(s === 'M') { mPerson = i; newS.workDays[i]++; } 
-                                else if(s !== 'O') { latePerson = i; newS.workDays[i]++; }
+                                else if(s !== 'O') { 
+                                    latePerson = i; 
+                                    newS.workDays[i]++; 
+                                    newS.lateShifts[i]++; 
+                                }
                             }
                             if(mPerson !== -1 && latePerson !== -1) newS.pairs[mPerson+','+latePerson]++;
                         }
@@ -1079,35 +1105,30 @@
         const btn = document.getElementById('generateBtn');
         const originalBtnText = btn.innerHTML;
         
-        // อัปเดต UI ให้รู้ว่ากำลังโหลด (ปุ่มกดไม่ได้)
-        btn.innerHTML = '⏳ กำลังคำนวณแบบ Background...';
+        btn.innerHTML = '⏳ กำลังประมวลผล...';
         btn.disabled = true;
 
-        document.getElementById('resultStatus').innerHTML = "⏳ รอสักครู่... ระบบกำลังหาความเป็นไปได้ (หน้าจอไม่ค้างแล้ว)";
+        document.getElementById('resultStatus').innerHTML = "⏳ รอสักครู่...";
         document.getElementById('resultStatus').style.color = "var(--warning)";
         document.getElementById('outputSection').style.display = 'block';
         document.getElementById('rosterActionContainer').style.display = 'none';
         
-        // ซ่อนผลลัพธ์เก่าระหว่างรอ
         document.getElementById('monthlyTables').innerHTML = '';
         document.getElementById('finalPersonTable').querySelector('tbody').innerHTML = '';
         document.getElementById('finalPairMatrixContainer').innerHTML = '';
 
-        // แปลงฟังก์ชัน Worker เป็น String เพื่อใช้งานแบบ Inline
         const workerBlob = new Blob(['(' + rosterAlgorithmWorker.toString() + ')()'], { type: 'text/javascript' });
         const worker = new Worker(URL.createObjectURL(workerBlob));
 
-        // ส่งข้อมูลให้ Worker คิด
         worker.postMessage({
             historyBlocks: historyBlocks,
             allLocks: allLocks,
             lsFuture: document.getElementById('lateShiftFuture').value,
-            maxSearchLimit: 24
+            maxSearchLimit: 12
         });
 
-        // รับผลลัพธ์จาก Worker
         worker.onmessage = function(e) {
-            btn.innerHTML = originalBtnText; // คืนค่าปุ่มเดิม
+            btn.innerHTML = originalBtnText; 
             btn.disabled = false;
             
             const result = e.data;
@@ -1136,7 +1157,6 @@
                 renderPairMatrix('finalPairMatrixContainer', lastRes.statsAtEnd);
                 renderFinalTables(finalRes);
                 
-                // เลื่อนหน้าจอลงไปดูผลลัพธ์อัตโนมัติ
                 document.getElementById('outputSection').scrollIntoView({ behavior: 'smooth' });
 
             } else {
@@ -1145,7 +1165,7 @@
                 document.getElementById('resultStatus').style.color = "var(--danger)";
             }
 
-            worker.terminate(); // ปิด Worker เพื่อคืนหน่วยความจำให้ระบบ
+            worker.terminate(); 
         };
     }
 </script>
