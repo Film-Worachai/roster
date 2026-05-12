@@ -652,7 +652,7 @@
     function updateLockTableUI() {
         let m = parseInt(document.getElementById('lockMonth').value), y = parseInt(document.getElementById('lockYear').value);
         let days = new Date(y, m, 0).getDate(), monthKey = `${y}-${String(m).padStart(2, '0')}`;
-        let html = `<table class="excel-table"><thead><tr><th style="width: 100px;">ชื่อพนักงาน</th>`;
+        let html = `<table class="excel-table"><thead><tr><th style="width: 100px;">NAME</th>`;
         for(let d=1; d<=days; d++) {
             let isWeekend = (new Date(y, m - 1, d).getDay() % 6 === 0);
             html += `<th style="${isWeekend ? 'color: red;' : ''} width: 25px;">${d}</th>`;
