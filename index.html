@@ -308,6 +308,12 @@
     let allLocks = {};
     window.generatedRoster =[]; 
 
+    function escapeHTML(str) {
+        return String(str).replace(/[&<>'"]/g, tag => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        }[tag] || tag));
+    }
+
     function getFullMonthText(m, y) {
         let be = parseInt(y) + 543;
         let mm = String(m).padStart(2, '0');
@@ -411,34 +417,23 @@
     };
 
     async function fetchDataFromGitHub() {
-        if (!confirm("การโหลดข้อมูล จะเขียนทับข้อมูลประวัติเวรปัจจุบันของคุณทั้งหมด\n\nคุณแน่ใจหรือไม่ที่จะดำเนินการต่อ?")) {
-            return;
-        }
-
+        if (!confirm("การโหลดข้อมูล จะเขียนทับข้อมูลประวัติเวรปัจจุบันของคุณทั้งหมด\n\nคุณแน่ใจหรือไม่ที่จะดำเนินการต่อ?")) return;
         try {
             const response = await fetch('./shift_data_backup.json');
             if (!response.ok) throw new Error('ไม่พบไฟล์ข้อมูลในระบบ');
-
             const masterData = await response.json();
-            
             if (masterData.persons) persons = masterData.persons;
             if (masterData.historyBlocks) historyBlocks = masterData.historyBlocks;
             if (masterData.allLocks) allLocks = masterData.allLocks;
-
-            // บันทึกทับลงเครื่อง
             localStorage.setItem('shiftPersons', JSON.stringify(persons));
             localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
             localStorage.setItem('shiftLocksJSON', JSON.stringify(allLocks));
-            
-            // ยกเลิกสถานะการล้างข้อมูล เพื่อให้กลับมาอิงข้อมูลนี้
             localStorage.removeItem('isClearedManually');
-
             alert("✅ ดึงข้อมูลสำเร็จ! ระบบจะทำการโหลดหน้าเว็บใหม่");
             location.reload();
-
         } catch (error) {
             console.warn(error);
-            alert("❌ เกิดข้อผิดพลาด: ไม่สามารถดึงข้อมูลจากเซิร์ฟเวอร์ได้ (โปรดตรวจสอบว่ามีไฟล์ shift_data_backup.json อยู่บน GitHub หรือไม่)");
+            alert("❌ เกิดข้อผิดพลาด: ไม่สามารถดึงข้อมูลจากเซิร์ฟเวอร์ได้");
         }
     }
 
@@ -462,7 +457,6 @@
             btn.style.backgroundColor = "var(--success)";
             setTimeout(() => { btn.innerHTML = originalText; btn.style.backgroundColor = "var(--success)"; }, 2000);
         }
-
         lockIcons.forEach(icon => icon.innerText = ' 🔒');
     }
 
@@ -600,7 +594,7 @@
             for(let d=0; d<days; d++) { if(historySnap[i][startIndex+d] !== 'O') totalHours += 12; }
 
             html += `<tr>
-                <td rowspan="2" style="vertical-align: middle;"><b>${p}</b></td>
+                <td rowspan="2" style="vertical-align: middle;"><b>${escapeHTML(p)}</b></td>
                 <td>R</td>`;
             for(let d=0; d<days; d++) {
                 let s = historySnap[i][startIndex+d];
@@ -659,7 +653,7 @@
         }
         html += `</tr></thead><tbody>`;
         persons.forEach((p, i) => {
-            html += `<tr><td style="text-align: left; padding-left: 10px;"><b>${p}</b></td>`;
+            html += `<tr><td style="text-align: left; padding-left: 10px;"><b>${escapeHTML(p)}</b></td>`;
             for(let d=1; d<=days; d++) {
                 let s = (allLocks[monthKey] && allLocks[monthKey][i]) ? allLocks[monthKey][i][d] : '';
                 html += `<td onclick="toggleLock('${monthKey}',${i},${d})" class="clickable-cell ${s?'locked-cell shift-'+s:'shift-None'}">${s||'-'}</td>`;
@@ -707,12 +701,19 @@
     }
 
     const getDaysInMonth = (year, month) => new Date(year, month, 0).getDate();
+    
+    // Performance Optimization: Changed array callbacks to standard for loops
     function buildBaseHistory(blocks) {
         let h = {0:[], 1:[], 2:[], 3:[]};
-        blocks.forEach(b => {
-            let pat =['M', b.lateShift, 'O', 'O'];
-            for(let d=0; d<b.days; d++)[0,1,2,3].forEach(i => h[i].push(pat[(d+b.offsets[i])%4]));
-        });
+        for (let b = 0; b < blocks.length; b++) {
+            let block = blocks[b];
+            let pat = ['M', block.lateShift, 'O', 'O'];
+            for(let d=0; d<block.days; d++) {
+                for(let i=0; i<4; i++) {
+                    h[i].push(pat[(d + block.offsets[i]) % 4]);
+                }
+            }
+        }
         return h;
     }
 
@@ -721,18 +722,19 @@
         for(let i=0; i<4; i++) for(let j=0; j<4; j++) if(i!==j) s.pairs[`${i},${j}`] = 0;
         if(h[0].length === 0) return s;
         for(let d=0; d<h[0].length; d++) {
-            let mPerson = -1, latePerson = -1;[0,1,2,3].forEach(i => { 
-                if(h[i][d] === 'M') { mPerson = i; s.workDays[i]++; } else if(h[i][d] !== 'O') { latePerson = i; s.workDays[i]++; }
-            });
+            let mPerson = -1, latePerson = -1;
+            for(let i=0; i<4; i++) { 
+                if(h[i][d] === 'M') { mPerson = i; s.workDays[i]++; } 
+                else if(h[i][d] !== 'O') { latePerson = i; s.workDays[i]++; }
+            }
             if(mPerson !== -1 && latePerson !== -1) s.pairs[`${mPerson},${latePerson}`]++;
         }
-        blocks.forEach(b => { let pat =['M', b.lateShift, 'O', 'O'];[0,1,2,3].forEach(i => { if(pat[b.offsets[i]%4]==='M') s.firstDayM[i]++; }); });
+        for(let b=0; b<blocks.length; b++) { 
+            let block = blocks[b];
+            let pat = ['M', block.lateShift, 'O', 'O'];
+            for(let i=0; i<4; i++) { if(pat[block.offsets[i]%4]==='M') s.firstDayM[i]++; }
+        }
         return s;
-    }
-
-    function getVariance(obj) {
-        let v = Object.values(obj); if(!v.length) return 0;
-        let m = v.reduce((a,b)=>a+b,0)/v.length; return v.reduce((a,b)=>a+Math.pow(b-m,2),0)/v.length;
     }
 
     function getStdDev(obj) {
@@ -744,17 +746,22 @@
 
     const getStreakCounts = (historyArray) => {
         let workInst = 0, offInst = 0, wStreak = 0, oStreak = 0;
-        for (let s of historyArray) {
-            if (s !== 'O') { wStreak++; if(oStreak >= 3) offInst++; oStreak=0; } else { oStreak++; if(wStreak >= 3) workInst++; wStreak=0; }
+        for (let i = 0; i < historyArray.length; i++) {
+            let s = historyArray[i];
+            if (s !== 'O') { wStreak++; if(oStreak >= 3) offInst++; oStreak=0; } 
+            else { oStreak++; if(wStreak >= 3) workInst++; wStreak=0; }
         }
         if (oStreak >= 3) offInst++; if (wStreak >= 3) workInst++;
         return { workInst, offInst };
     };
 
-    function scoreCandidate(off, m, y, currentStats, pat, currentHist) {
-        let days = getDaysInMonth(y, m);
-        let simStats = { workDays: {...currentStats.workDays}, pairs: {...currentStats.pairs} };
-        let simFirstDayM = {...currentStats.firstDayM};
+    function scoreCandidate(off, m, y, currentStats, pat, currentHist, days) {
+        let simStats = { 
+            workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
+            pairs: Object.assign({}, currentStats.pairs) 
+        };
+        let simFirstDayM = { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] };
+        
         for(let i=0; i<4; i++) if(pat[off[i]%4]==='M') simFirstDayM[i]++;
         
         let simHistoryForStreak = {0:[], 1:[], 2:[], 3:[]};
@@ -778,8 +785,9 @@
             simStreaks.off[i] = strk.offInst;
 
             let currentWorkStreak = 0;
-            for(let s of fullHist.slice(-10)) { 
-                if (s !== 'O') {
+            let startIdx = Math.max(0, fullHist.length - 10);
+            for(let j = startIdx; j < fullHist.length; j++) { 
+                if (fullHist[j] !== 'O') {
                     currentWorkStreak++;
                     if (currentWorkStreak > 4) hardPenalty += 2000; 
                 } else {
@@ -807,6 +815,8 @@
 
         const perms = getPermutations([0,1,2,3]);
         const MAX_BRANCHES = 6; 
+        // Performance: Cache DOM reading outside the recursive loop
+        const lsFuture = document.getElementById('lateShiftFuture').value;
 
         function miniSolve(m, y, currentStats, currentHist, depth, maxDepth) {
             let works = Object.values(currentStats.workDays);
@@ -815,7 +825,7 @@
             if (depth >= maxDepth) return false;
 
             let days = getDaysInMonth(y, m);
-            let ls = document.getElementById('lateShiftFuture').value, pat = ['M', ls, 'O', 'O'];
+            let pat = ['M', lsFuture, 'O', 'O'];
             let candidates = perms.filter(off => {
                 for(let i=0; i<4; i++) {
                     let prev = currentHist[i][currentHist[i].length-1];
@@ -823,18 +833,24 @@
                 }
                 return true;
             });
-            candidates.sort((a, b) => scoreCandidate(a, m, y, currentStats, pat, currentHist) - scoreCandidate(b, m, y, currentStats, pat, currentHist));
-            
+            candidates.sort((a, b) => scoreCandidate(a, m, y, currentStats, pat, currentHist, days) - scoreCandidate(b, m, y, currentStats, pat, currentHist, days));
             candidates = candidates.slice(0, MAX_BRANCHES);
 
-            for (let off of candidates) {
-                let newH = {0:[...currentHist[0]], 1:[...currentHist[1]], 2:[...currentHist[2]], 3:[...currentHist[3]]};
-                let newS = {workDays:{...currentStats.workDays}, firstDayM:{...currentStats.firstDayM}, pairs:{...currentStats.pairs}};
+            for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
+                let off = candidates[cIdx];
+                // Performance: Fast clone instead of JSON stringify
+                let newH = { 0: currentHist[0].slice(), 1: currentHist[1].slice(), 2: currentHist[2].slice(), 3: currentHist[3].slice() };
+                let newS = {
+                    workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
+                    firstDayM: { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] },
+                    pairs: Object.assign({}, currentStats.pairs)
+                };
+                
                 for(let d=0; d<days; d++) {
-                    [0,1,2,3].forEach(i => {
+                    for (let i = 0; i < 4; i++) {
                         let s = pat[(d+off[i])%4]; newH[i].push(s);
                         if(s === 'M') newS.workDays[i]++; else if(s !== 'O') newS.workDays[i]++;
-                    });
+                    }
                 }
                 let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
                 if(miniSolve(nextM, nextY, newS, newH, depth + 1, maxDepth)) return true;
@@ -872,7 +888,7 @@
                 if (depth > targetMonths) return false;
 
                 let mk = `${y}-${String(m).padStart(2, '0')}`, days = getDaysInMonth(y, m);
-                let ls = document.getElementById('lateShiftFuture').value, pat = ['M', ls, 'O', 'O'];
+                let pat = ['M', lsFuture, 'O', 'O'];
 
                 let candidates = perms.filter(off => {
                     for(let i=0; i<4; i++) {
@@ -887,25 +903,35 @@
                     return true;
                 });
 
-                candidates.sort((a, b) => scoreCandidate(a, m, y, currentStats, pat, currentHist) - scoreCandidate(b, m, y, currentStats, pat, currentHist));
-                
+                candidates.sort((a, b) => scoreCandidate(a, m, y, currentStats, pat, currentHist, days) - scoreCandidate(b, m, y, currentStats, pat, currentHist, days));
                 candidates = candidates.slice(0, MAX_BRANCHES);
 
-                for (let off of candidates) {
-                    let newH = {0:[...currentHist[0]], 1:[...currentHist[1]], 2:[...currentHist[2]], 3:[...currentHist[3]]};
-                    let newS = {workDays:{...currentStats.workDays}, firstDayM:{...currentStats.firstDayM}, pairs:{...currentStats.pairs}};
+                for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
+                    let off = candidates[cIdx];
+                    // Performance: Fast clone 
+                    let newH = { 0: currentHist[0].slice(), 1: currentHist[1].slice(), 2: currentHist[2].slice(), 3: currentHist[3].slice() };
+                    let newS = {
+                        workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
+                        firstDayM: { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] },
+                        pairs: Object.assign({}, currentStats.pairs)
+                    };
+
                     for(let i=0; i<4; i++) if(pat[off[i]%4]==='M') newS.firstDayM[i]++;
                     
                     for(let d=0; d<days; d++) {
-                        let mPerson = -1, latePerson = -1; [0,1,2,3].forEach(i => {
+                        let mPerson = -1, latePerson = -1; 
+                        for (let i = 0; i < 4; i++) {
                             let s = pat[(d+off[i])%4]; newH[i].push(s);
-                            if(s === 'M') { mPerson = i; newS.workDays[i]++; } else if(s !== 'O') { latePerson = i; newS.workDays[i]++; }
-                        });
+                            if(s === 'M') { mPerson = i; newS.workDays[i]++; } 
+                            else if(s !== 'O') { latePerson = i; newS.workDays[i]++; }
+                        }
                         if(mPerson !== -1 && latePerson !== -1) newS.pairs[`${mPerson},${latePerson}`]++;
                     }
                     let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
                     if(solve(nextM, nextY, newS, newH, depth + 1)) {
-                        results.push({m, y, days, off, ls, historySnapshot: JSON.parse(JSON.stringify(newH)), statsAtEnd: newS});
+                        // Fast clone for snapshot
+                        let finalSnapshot = { 0: newH[0].slice(), 1: newH[1].slice(), 2: newH[2].slice(), 3: newH[3].slice() };
+                        results.push({m, y, days, off, ls: lsFuture, historySnapshot: finalSnapshot, statsAtEnd: newS});
                         return true;
                     }
                 }
@@ -985,7 +1011,7 @@
         persons.forEach((p, i) => {
             let streaks = getStreakCounts(histObj[i] ||[]);
             tbody.innerHTML += `<tr style="font-weight: bold;">
-                <td style="text-align: left; padding-left: 10px;">${p}</td>
+                <td style="text-align: left; padding-left: 10px;">${escapeHTML(p)}</td>
                 <td>${s.workDays[i]*12}</td>
                 <td>${streaks.workInst}</td>
                 <td>${streaks.offInst}</td>
@@ -996,10 +1022,10 @@
 
     function renderPairMatrix(id, s) {
         let html = '<table class="matrix-table"><thead><tr><th>M \\ A,N</th>';
-        persons.forEach(p => html += `<th>${p.substring(0,3)}</th>`);
+        persons.forEach(p => html += `<th>${escapeHTML(p).substring(0,3)}</th>`);
         html += '</tr></thead><tbody style="font-weight: bold;">';
         persons.forEach((p, i) => {
-            html += `<tr><td>${p.substring(0,3)}</td>`;
+            html += `<tr><td>${escapeHTML(p).substring(0,3)}</td>`;
             persons.forEach((p2, j) => {
                 if(i === j) html += '<td style="background:var(--bg); color: var(--text-muted);">-</td>';
                 else html += `<td>${s.pairs[`${i},${j}`]||0}</td>`;
@@ -1015,7 +1041,7 @@
         let res =[];
         for (let i = 0; i < arr.length; i++) {
             let rest = getPermutations([...arr.slice(0, i), ...arr.slice(i + 1)]);
-            rest.forEach(p => res.push([arr[i], ...p]));
+            for (let j = 0; j < rest.length; j++) res.push([arr[i], ...rest[j]]);
         }
         return res;
     }
