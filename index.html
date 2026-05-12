@@ -68,9 +68,9 @@
             cursor: pointer; transition: all 0.2s ease; 
             display: inline-flex; align-items: center; justify-content: center; gap: 6px;
         }
-        button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-        button:active { transform: translateY(0); }
-        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+        button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        button:active:not(:disabled) { transform: translateY(0); }
+        button:disabled { opacity: 0.7; cursor: not-allowed; transform: none; box-shadow: none; background-color: #94A3B8; }
         
         .btn-primary { background-color: var(--primary); color: white; }
         .btn-primary:hover { background-color: var(--primary-hover); }
@@ -278,7 +278,7 @@
             <div id="lockUiContainer" class="table-responsive" style="border: 1px solid var(--border);"></div>
         </div>
 
-        <button class="btn-success mt-3" onclick="generateFutureSchedule()">🚀 จัด Roster</button>
+        <button id="generateBtn" class="btn-success mt-3" onclick="generateFutureSchedule()">🚀 จัด Roster</button>
     </div>
 
     <div id="outputSection">
@@ -308,10 +308,21 @@
     let allLocks = {};
     window.generatedRoster =[]; 
 
+    // --- ความปลอดภัย ---
     function escapeHTML(str) {
         return String(str).replace(/[&<>'"]/g, tag => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
         }[tag] || tag));
+    }
+
+    function getSafeJSON(key, fallbackValue) {
+        try {
+            const item = localStorage.getItem(key);
+            return item ? JSON.parse(item) : fallbackValue;
+        } catch (error) {
+            console.warn(`ข้อมูล ${key} เสียหาย ทำการรีเซ็ตค่าเริ่มต้น`);
+            return fallbackValue;
+        }
     }
 
     function getFullMonthText(m, y) {
@@ -336,6 +347,13 @@
 
     function onYearChange(selectId, yearId) {
         populateMonthSelect(selectId, yearId);
+    }
+
+    // --- State-Driven UI Update ---
+    function refreshAllViews() {
+        initializeUI(); 
+        document.getElementById('outputSection').style.display = 'none'; // ซ่อนตารางจัดเวรเดิมเวลาอัปเดตข้อมูลฐาน
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function initializeUI() {
@@ -379,15 +397,13 @@
     }
 
     window.onload = async () => {
-        const sb = localStorage.getItem('shiftHistoryBlocks');
-        const sp = localStorage.getItem('shiftPersons');
-        const sl = localStorage.getItem('shiftLocksJSON');
+        // ใช้ getSafeJSON แทน JSON.parse ตรงๆ
         const isClearedManually = localStorage.getItem('isClearedManually'); 
-
-        if (sp && sb) {
-            persons = JSON.parse(sp);
-            historyBlocks = JSON.parse(sb);
-            if (sl) allLocks = JSON.parse(sl);
+        
+        if (localStorage.getItem('shiftPersons') && localStorage.getItem('shiftHistoryBlocks')) {
+            persons = getSafeJSON('shiftPersons', persons);
+            historyBlocks = getSafeJSON('shiftHistoryBlocks', []);
+            allLocks = getSafeJSON('shiftLocksJSON', {});
             initializeUI();
         } else if (!isClearedManually) {
             try {
@@ -422,42 +438,22 @@
             const response = await fetch('./shift_data_backup.json');
             if (!response.ok) throw new Error('ไม่พบไฟล์ข้อมูลในระบบ');
             const masterData = await response.json();
+            
             if (masterData.persons) persons = masterData.persons;
             if (masterData.historyBlocks) historyBlocks = masterData.historyBlocks;
             if (masterData.allLocks) allLocks = masterData.allLocks;
+
             localStorage.setItem('shiftPersons', JSON.stringify(persons));
             localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
             localStorage.setItem('shiftLocksJSON', JSON.stringify(allLocks));
             localStorage.removeItem('isClearedManually');
-            alert("✅ ดึงข้อมูลสำเร็จ! ระบบจะทำการโหลดหน้าเว็บใหม่");
-            location.reload();
+            
+            alert("✅ ดึงข้อมูลสำเร็จ!");
+            refreshAllViews(); // แทน location.reload()
         } catch (error) {
             console.warn(error);
             alert("❌ เกิดข้อผิดพลาด: ไม่สามารถดึงข้อมูลจากเซิร์ฟเวอร์ได้");
         }
-    }
-
-    function copyTableToExcel(tableId) {
-        var el = document.getElementById(tableId);
-        var lockIcons = el.querySelectorAll('.lock-icon');
-        lockIcons.forEach(icon => icon.innerText = '');
-
-        var body = document.body, range, sel;
-        if (document.createRange && window.getSelection) {
-            range = document.createRange();
-            sel = window.getSelection();
-            sel.removeAllRanges();
-            try { range.selectNodeContents(el); sel.addRange(range); } catch (e) { range.selectNode(el); sel.addRange(range); }
-            document.execCommand("copy");
-            sel.removeAllRanges();
-            
-            const btn = el.parentElement.querySelector('button');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = "✅ คัดลอกแล้ว!";
-            btn.style.backgroundColor = "var(--success)";
-            setTimeout(() => { btn.innerHTML = originalText; btn.style.backgroundColor = "var(--success)"; }, 2000);
-        }
-        lockIcons.forEach(icon => icon.innerText = ' 🔒');
     }
 
     function exportDataJSON() {
@@ -480,12 +476,12 @@
         reader.onload = function(e) {
             try {
                 const importedData = JSON.parse(e.target.result);
-                if (importedData.persons) localStorage.setItem('shiftPersons', JSON.stringify(importedData.persons));
-                if (importedData.historyBlocks) localStorage.setItem('shiftHistoryBlocks', JSON.stringify(importedData.historyBlocks));
-                if (importedData.allLocks) localStorage.setItem('shiftLocksJSON', JSON.stringify(importedData.allLocks));
+                if (importedData.persons) { persons = importedData.persons; localStorage.setItem('shiftPersons', JSON.stringify(persons)); }
+                if (importedData.historyBlocks) { historyBlocks = importedData.historyBlocks; localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks)); }
+                if (importedData.allLocks) { allLocks = importedData.allLocks; localStorage.setItem('shiftLocksJSON', JSON.stringify(allLocks)); }
                 localStorage.removeItem('isClearedManually');
-                alert("✅ นำเข้าข้อมูลสำเร็จ! ระบบจะทำการโหลดหน้าเว็บใหม่");
-                location.reload();
+                alert("✅ นำเข้าข้อมูลสำเร็จ!");
+                refreshAllViews(); // แทน location.reload()
             } catch (error) { alert("❌ เกิดข้อผิดพลาด! ไฟล์ข้อมูลไม่ถูกต้องหรือไม่สามารถอ่านได้"); }
         };
         reader.readAsText(file);
@@ -526,22 +522,15 @@
         localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
         localStorage.removeItem('isClearedManually');
         
-        let nm = m + 1, ny = y; if(nm > 12) { nm=1; ny++; }
-        
-        document.getElementById('inputYear').value = ny;
-        document.getElementById('lockYear').value = ny;
-        populateMonthSelect('inputMonth', 'inputYear');
-        populateMonthSelect('lockMonth', 'lockYear');
-        document.getElementById('inputMonth').value = nm;
-        document.getElementById('lockMonth').value = nm;
-        
-        let lastDays = new Date(y, m, 0).getDate();
-        for(let i=0; i<4; i++) document.getElementById('pattern'+i).value = (lastDays + offsets[i]) % 4;
-
-        renderHistoryBadges(); updatePreview(); renderSavedHistoryTables(); updateLockTableUI();
+        refreshAllViews();
     }
 
-    function undoHistoryMonth() { historyBlocks.pop(); localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks)); location.reload(); }
+    function undoHistoryMonth() { 
+        if(historyBlocks.length === 0) return;
+        historyBlocks.pop(); 
+        localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks)); 
+        refreshAllViews(); // แทน location.reload()
+    }
 
     function renderHistoryBadges() {
         const c = document.getElementById('historyBadgesContainer');
@@ -551,6 +540,29 @@
             c.innerHTML += `<div class="history-badge">✔️ ${fullText} <span style="color:var(--primary); font-weight:700;">(M${b.lateShift})</span></div>`;
         });
         document.getElementById('historyCountStr').innerText = historyBlocks.length + " เดือน";
+    }
+
+    function copyTableToExcel(tableId) {
+        var el = document.getElementById(tableId);
+        var lockIcons = el.querySelectorAll('.lock-icon');
+        lockIcons.forEach(icon => icon.innerText = '');
+
+        var body = document.body, range, sel;
+        if (document.createRange && window.getSelection) {
+            range = document.createRange();
+            sel = window.getSelection();
+            sel.removeAllRanges();
+            try { range.selectNodeContents(el); sel.addRange(range); } catch (e) { range.selectNode(el); sel.addRange(range); }
+            document.execCommand("copy");
+            sel.removeAllRanges();
+            
+            const btn = el.parentElement.querySelector('button');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "✅ คัดลอกแล้ว!";
+            btn.style.backgroundColor = "var(--success)";
+            setTimeout(() => { btn.innerHTML = originalText; btn.style.backgroundColor = "var(--success)"; }, 2000);
+        }
+        lockIcons.forEach(icon => icon.innerText = ' 🔒');
     }
 
     function generateExcelStyleHTML(m, y, days, ls, historySnap, isFuture, monthKeyForLocks) {
@@ -700,18 +712,25 @@
         }
     }
 
-    const getDaysInMonth = (year, month) => new Date(year, month, 0).getDate();
-    
-    // Performance Optimization: Changed array callbacks to standard for loops
+    function clearDatabase() { 
+        if(confirm("ล้างข้อมูลทั้งหมด? การตั้งค่าและประวัติจะหายทั้งหมด")) { 
+            localStorage.clear(); 
+            localStorage.setItem('isClearedManually', 'true');
+            persons = ['KOMKRIT', 'NATTHAPOL', 'KONCHANOK', 'WORACHAI'];
+            historyBlocks = [];
+            allLocks = {};
+            refreshAllViews(); // แทน location.reload()
+        } 
+    }
+
+    // --- Helper Functions for Main UI ---
     function buildBaseHistory(blocks) {
         let h = {0:[], 1:[], 2:[], 3:[]};
         for (let b = 0; b < blocks.length; b++) {
             let block = blocks[b];
             let pat = ['M', block.lateShift, 'O', 'O'];
             for(let d=0; d<block.days; d++) {
-                for(let i=0; i<4; i++) {
-                    h[i].push(pat[(d + block.offsets[i]) % 4]);
-                }
+                for(let i=0; i<4; i++) h[i].push(pat[(d + block.offsets[i]) % 4]);
             }
         }
         return h;
@@ -737,13 +756,6 @@
         return s;
     }
 
-    function getStdDev(obj) {
-        let v = Object.values(obj); if(!v.length) return 0;
-        let m = v.reduce((a,b)=>a+b,0)/v.length;
-        let variance = v.reduce((a,b)=>a+Math.pow(b-m,2),0)/v.length;
-        return Math.sqrt(variance);
-    }
-
     const getStreakCounts = (historyArray) => {
         let workInst = 0, offInst = 0, wStreak = 0, oStreak = 0;
         for (let i = 0; i < historyArray.length; i++) {
@@ -754,257 +766,6 @@
         if (oStreak >= 3) offInst++; if (wStreak >= 3) workInst++;
         return { workInst, offInst };
     };
-
-    function scoreCandidate(off, m, y, currentStats, pat, currentHist, days) {
-        let simStats = { 
-            workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
-            pairs: Object.assign({}, currentStats.pairs) 
-        };
-        let simFirstDayM = { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] };
-        
-        for(let i=0; i<4; i++) if(pat[off[i]%4]==='M') simFirstDayM[i]++;
-        
-        let simHistoryForStreak = {0:[], 1:[], 2:[], 3:[]};
-        for(let d=0; d<days; d++) {
-            let mPerson = -1, latePerson = -1;
-            for(let i=0; i<4; i++) {
-                let s = pat[(d+off[i])%4]; simHistoryForStreak[i].push(s);
-                if(s === 'M') { mPerson = i; simStats.workDays[i]++; } 
-                else if(s !== 'O') { latePerson = i; simStats.workDays[i]++; }
-            }
-            if(mPerson !== -1 && latePerson !== -1) simStats.pairs[`${mPerson},${latePerson}`]++;
-        }
-        
-        let simStreaks = {work:{}, off:{}};
-        let hardPenalty = 0; 
-        
-        for(let i=0; i<4; i++) {
-            let fullHist = currentHist[i].concat(simHistoryForStreak[i]);
-            let strk = getStreakCounts(fullHist);
-            simStreaks.work[i] = strk.workInst; 
-            simStreaks.off[i] = strk.offInst;
-
-            let currentWorkStreak = 0;
-            let startIdx = Math.max(0, fullHist.length - 10);
-            for(let j = startIdx; j < fullHist.length; j++) { 
-                if (fullHist[j] !== 'O') {
-                    currentWorkStreak++;
-                    if (currentWorkStreak > 4) hardPenalty += 2000; 
-                } else {
-                    currentWorkStreak = 0;
-                }
-            }
-        }
-
-        return hardPenalty + 
-               (getStdDev(simStats.workDays) * 200) +   
-               (getStdDev(simStreaks.work) * 100) +     
-               (getStdDev(simStreaks.off) * 100) +      
-               (getStdDev(simFirstDayM) * 100) +        
-               (getStdDev(simStats.pairs) * 10);        
-    }
-
-    async function generateFutureSchedule() {
-        if(historyBlocks.length === 0) return alert("กรุณาใส่ประวัติอย่างน้อย 1 เดือนก่อนครับ");
-        document.getElementById('resultStatus').innerHTML = "⏳ กำลังประมวลผล...";
-        document.getElementById('resultStatus').style.color = "var(--warning)";
-        document.getElementById('outputSection').style.display = 'block';
-        document.getElementById('rosterActionContainer').style.display = 'none';
-        
-        await new Promise(resolve => setTimeout(resolve, 50));
-
-        const perms = getPermutations([0,1,2,3]);
-        const MAX_BRANCHES = 6; 
-        // Performance: Cache DOM reading outside the recursive loop
-        const lsFuture = document.getElementById('lateShiftFuture').value;
-
-        function miniSolve(m, y, currentStats, currentHist, depth, maxDepth) {
-            let works = Object.values(currentStats.workDays);
-            let isHoursEqual = works.length > 0 && works.every(val => val === works[0]);
-            if (isHoursEqual && depth > 0) return true;
-            if (depth >= maxDepth) return false;
-
-            let days = getDaysInMonth(y, m);
-            let pat = ['M', lsFuture, 'O', 'O'];
-            let candidates = perms.filter(off => {
-                for(let i=0; i<4; i++) {
-                    let prev = currentHist[i][currentHist[i].length-1];
-                    if((prev==='N'||prev==='A') && pat[off[i]%4]==='M') return false;
-                }
-                return true;
-            });
-            candidates.sort((a, b) => scoreCandidate(a, m, y, currentStats, pat, currentHist, days) - scoreCandidate(b, m, y, currentStats, pat, currentHist, days));
-            candidates = candidates.slice(0, MAX_BRANCHES);
-
-            for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
-                let off = candidates[cIdx];
-                // Performance: Fast clone instead of JSON stringify
-                let newH = { 0: currentHist[0].slice(), 1: currentHist[1].slice(), 2: currentHist[2].slice(), 3: currentHist[3].slice() };
-                let newS = {
-                    workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
-                    firstDayM: { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] },
-                    pairs: Object.assign({}, currentStats.pairs)
-                };
-                
-                for(let d=0; d<days; d++) {
-                    for (let i = 0; i < 4; i++) {
-                        let s = pat[(d+off[i])%4]; newH[i].push(s);
-                        if(s === 'M') newS.workDays[i]++; else if(s !== 'O') newS.workDays[i]++;
-                    }
-                }
-                let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
-                if(miniSolve(nextM, nextY, newS, newH, depth + 1, maxDepth)) return true;
-            }
-            return false;
-        }
-
-        function executeSolveExact(targetMonths, requireFutureProof) {
-            let last = historyBlocks[historyBlocks.length-1];
-            let curM = last.m + 1, curY = last.y; if(curM > 12){ curM=1; curY++; }
-            
-            let targetM = curM - 1, targetY = curY; 
-            for (let mk in allLocks) {
-                let [ly, lm] = mk.split('-'); ly = parseInt(ly); lm = parseInt(lm);
-                if (ly > curY || (ly === curY && lm >= curM)) { if (ly > targetY || (ly === targetY && lm > targetM)) { targetY = ly; targetM = lm; } }
-            }
-
-            let results = [], baseH = buildBaseHistory(historyBlocks), baseS = calculateStats(baseH, historyBlocks);
-
-            function solve(m, y, currentStats, currentHist, depth) {
-                let works = Object.values(currentStats.workDays);
-                let isHoursEqual = works.length > 0 && works.every(val => val === works[0]);
-                let passedTarget = (y > targetY || (y === targetY && m > targetM));
-
-                if (depth === targetMonths) {
-                    if (passedTarget && isHoursEqual) {
-                        if (requireFutureProof) {
-                            let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
-                            return miniSolve(nextM, nextY, currentStats, currentHist, 0, 3);
-                        }
-                        return true;
-                    }
-                    return false;
-                }
-                if (depth > targetMonths) return false;
-
-                let mk = `${y}-${String(m).padStart(2, '0')}`, days = getDaysInMonth(y, m);
-                let pat = ['M', lsFuture, 'O', 'O'];
-
-                let candidates = perms.filter(off => {
-                    for(let i=0; i<4; i++) {
-                        let prev = currentHist[i][currentHist[i].length-1];
-                        if((prev==='N'||prev==='A') && pat[off[i]%4]==='M') return false;
-                    }
-                    if(allLocks[mk]) {
-                        for(let i=0; i<4; i++) if(allLocks[mk][i]) {
-                            for(let d in allLocks[mk][i]) if(pat[(parseInt(d)-1+off[i])%4] !== allLocks[mk][i][d]) return false;
-                        }
-                    }
-                    return true;
-                });
-
-                candidates.sort((a, b) => scoreCandidate(a, m, y, currentStats, pat, currentHist, days) - scoreCandidate(b, m, y, currentStats, pat, currentHist, days));
-                candidates = candidates.slice(0, MAX_BRANCHES);
-
-                for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
-                    let off = candidates[cIdx];
-                    // Performance: Fast clone 
-                    let newH = { 0: currentHist[0].slice(), 1: currentHist[1].slice(), 2: currentHist[2].slice(), 3: currentHist[3].slice() };
-                    let newS = {
-                        workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
-                        firstDayM: { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] },
-                        pairs: Object.assign({}, currentStats.pairs)
-                    };
-
-                    for(let i=0; i<4; i++) if(pat[off[i]%4]==='M') newS.firstDayM[i]++;
-                    
-                    for(let d=0; d<days; d++) {
-                        let mPerson = -1, latePerson = -1; 
-                        for (let i = 0; i < 4; i++) {
-                            let s = pat[(d+off[i])%4]; newH[i].push(s);
-                            if(s === 'M') { mPerson = i; newS.workDays[i]++; } 
-                            else if(s !== 'O') { latePerson = i; newS.workDays[i]++; }
-                        }
-                        if(mPerson !== -1 && latePerson !== -1) newS.pairs[`${mPerson},${latePerson}`]++;
-                    }
-                    let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
-                    if(solve(nextM, nextY, newS, newH, depth + 1)) {
-                        // Fast clone for snapshot
-                        let finalSnapshot = { 0: newH[0].slice(), 1: newH[1].slice(), 2: newH[2].slice(), 3: newH[3].slice() };
-                        results.push({m, y, days, off, ls: lsFuture, historySnapshot: finalSnapshot, statsAtEnd: newS});
-                        return true;
-                    }
-                }
-                return false;
-            }
-
-            if (solve(curM, curY, baseS, baseH, 0)) {
-                return results.reverse();
-            }
-            return null;
-        }
-
-        let maxSearchLimit = 24; 
-        let finalRes = null;
-
-        for (let targetFutureMonths = 1; targetFutureMonths <= maxSearchLimit; targetFutureMonths++) {
-            let resNormal = executeSolveExact(targetFutureMonths, true);
-            if (resNormal) {
-                finalRes = resNormal;
-                break;
-            }
-        }
-
-        if (!finalRes) {
-            for (let targetFutureMonths = 1; targetFutureMonths <= maxSearchLimit; targetFutureMonths++) {
-                let resNormal = executeSolveExact(targetFutureMonths, false);
-                if (resNormal) { 
-                    finalRes = resNormal; 
-                    break; 
-                }
-            }
-        }
-
-        if (finalRes) {
-            let lastRes = finalRes[finalRes.length-1];
-            let works = Object.values(lastRes.statsAtEnd.workDays);
-            let isPerfect = works.every(val => val === works[0]);
-
-            window.generatedRoster = finalRes; 
-            document.getElementById('rosterActionContainer').style.display = 'flex'; 
-
-            let statusHTML = "";
-
-            if (isPerfect) {
-                statusHTML = `✅ จัด Roster สำเร็จ! (ล่วงหน้า ${finalRes.length} เดือน)`;
-                document.getElementById('resultStatus').style.color = "var(--success)";
-            } else {
-                statusHTML = `⚠️ จัดผ่านวันล็อคสำเร็จ! แต่ชนขีดจำกัดสูงสุด ${finalRes.length} เดือน (ชั่วโมงอาจไม่เท่ากันเป๊ะ)`;
-                document.getElementById('resultStatus').style.color = "var(--warning)";
-            }
-
-            document.getElementById('resultStatus').innerHTML = statusHTML;
-            renderTable('finalPersonTable', lastRes.historySnapshot, lastRes.statsAtEnd);
-            renderPairMatrix('finalPairMatrixContainer', lastRes.statsAtEnd);
-            renderFinalTables(finalRes);
-        } else {
-            window.generatedRoster = [];
-            document.getElementById('resultStatus').innerHTML = "❌ ไม่สามารถจัดได้: วันที่ล็อคอาจขัดแย้งกับกฎ หรือไม่สามารถหาทางลงตัวได้ภายใน 12 เดือน";
-            document.getElementById('resultStatus').style.color = "var(--danger)";
-        }
-    }
-
-    function commitRosterToHistory() {
-        if(!window.generatedRoster || window.generatedRoster.length === 0) return;
-        if(confirm(`ยืนยันการบันทึกตารางเวรที่จัดสำเร็จแล้วทั้ง ${window.generatedRoster.length} เดือน ลงในประวัติย้อนหลังหรือไม่?\n\n*ระบบจะทำการโหลดหน้าจอใหม่หลังบันทึกเสร็จสิ้น`)) {
-            window.generatedRoster.forEach(r => {
-                historyBlocks.push({ m: r.m, y: r.y, days: r.days, offsets: r.off, lateShift: r.ls });
-            });
-            localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
-            alert("✅ เพิ่มไปยังประวัติเวรเรียบร้อยแล้ว!");
-            location.reload();
-        }
-    }
 
     function renderTable(id, histObj, s) {
         const tbody = document.querySelector(`#${id} tbody`); tbody.innerHTML = '';
@@ -1036,22 +797,356 @@
         document.getElementById(id).innerHTML = html;
     }
 
-    function getPermutations(arr) {
-        if (arr.length <= 1) return [arr];
-        let res =[];
-        for (let i = 0; i < arr.length; i++) {
-            let rest = getPermutations([...arr.slice(0, i), ...arr.slice(i + 1)]);
-            for (let j = 0; j < rest.length; j++) res.push([arr[i], ...rest[j]]);
+    function commitRosterToHistory() {
+        if(!window.generatedRoster || window.generatedRoster.length === 0) return;
+        if(confirm(`ยืนยันการบันทึกตารางเวรที่จัดสำเร็จแล้วทั้ง ${window.generatedRoster.length} เดือน ลงในประวัติย้อนหลังหรือไม่?`)) {
+            window.generatedRoster.forEach(r => {
+                historyBlocks.push({ m: r.m, y: r.y, days: r.days, offsets: r.off, lateShift: r.ls });
+            });
+            localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks));
+            alert("✅ เพิ่มไปยังประวัติเวรเรียบร้อยแล้ว!");
+            refreshAllViews(); // อัปเดต UI โดยไม่โหลดหน้าใหม่
         }
-        return res;
     }
 
-    function clearDatabase() { 
-        if(confirm("ล้างข้อมูลทั้งหมด? การตั้งค่าและประวัติจะหายทั้งหมด")) { 
-            localStorage.clear(); 
-            localStorage.setItem('isClearedManually', 'true');
-            location.reload(); 
-        } 
+    // =======================================================
+    // 🧠 THE WEB WORKER: จัดการอัลกอริทึมที่หนักหน่วงแบบ Background
+    // =======================================================
+    function rosterAlgorithmWorker() {
+        self.onmessage = function(e) {
+            const { historyBlocks, allLocks, lsFuture, maxSearchLimit } = e.data;
+
+            // --- Helper Functions (ต้องก็อปปี้เข้ามาไว้ใน Worker เพราะ Worker เข้าถึงข้างนอกไม่ได้) ---
+            const getDaysInMonth = (year, month) => new Date(year, month, 0).getDate();
+            
+            function buildBaseHistory(blocks) {
+                let h = {0:[], 1:[], 2:[], 3:[]};
+                for (let b = 0; b < blocks.length; b++) {
+                    let block = blocks[b];
+                    let pat = ['M', block.lateShift, 'O', 'O'];
+                    for(let d=0; d<block.days; d++) {
+                        for(let i=0; i<4; i++) h[i].push(pat[(d + block.offsets[i]) % 4]);
+                    }
+                }
+                return h;
+            }
+
+            function calculateStats(h, blocks) {
+                let s = {workDays:{0:0,1:0,2:0,3:0}, firstDayM:{0:0,1:0,2:0,3:0}, pairs:{}};
+                for(let i=0; i<4; i++) for(let j=0; j<4; j++) if(i!==j) s.pairs[i+','+j] = 0;
+                if(h[0].length === 0) return s;
+                for(let d=0; d<h[0].length; d++) {
+                    let mPerson = -1, latePerson = -1;
+                    for(let i=0; i<4; i++) { 
+                        if(h[i][d] === 'M') { mPerson = i; s.workDays[i]++; } 
+                        else if(h[i][d] !== 'O') { latePerson = i; s.workDays[i]++; }
+                    }
+                    if(mPerson !== -1 && latePerson !== -1) s.pairs[mPerson+','+latePerson]++;
+                }
+                for(let b=0; b<blocks.length; b++) { 
+                    let block = blocks[b];
+                    let pat = ['M', block.lateShift, 'O', 'O'];
+                    for(let i=0; i<4; i++) { if(pat[block.offsets[i]%4]==='M') s.firstDayM[i]++; }
+                }
+                return s;
+            }
+
+            function getStdDev(obj) {
+                let v = Object.values(obj); if(!v.length) return 0;
+                let m = v.reduce((a,b)=>a+b,0)/v.length;
+                let variance = v.reduce((a,b)=>a+Math.pow(b-m,2),0)/v.length;
+                return Math.sqrt(variance);
+            }
+
+            const getStreakCounts = (historyArray) => {
+                let workInst = 0, offInst = 0, wStreak = 0, oStreak = 0;
+                for (let i = 0; i < historyArray.length; i++) {
+                    let s = historyArray[i];
+                    if (s !== 'O') { wStreak++; if(oStreak >= 3) offInst++; oStreak=0; } 
+                    else { oStreak++; if(wStreak >= 3) workInst++; wStreak=0; }
+                }
+                if (oStreak >= 3) offInst++; if (wStreak >= 3) workInst++;
+                return { workInst, offInst };
+            };
+
+            function getPermutations(arr) {
+                if (arr.length <= 1) return [arr];
+                let res =[];
+                for (let i = 0; i < arr.length; i++) {
+                    let rest = getPermutations([...arr.slice(0, i), ...arr.slice(i + 1)]);
+                    for (let j = 0; j < rest.length; j++) res.push([arr[i], ...rest[j]]);
+                }
+                return res;
+            }
+
+            function scoreCandidate(off, m, y, currentStats, pat, currentHist, days) {
+                let simStats = { 
+                    workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
+                    pairs: Object.assign({}, currentStats.pairs) 
+                };
+                let simFirstDayM = { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] };
+                
+                for(let i=0; i<4; i++) if(pat[off[i]%4]==='M') simFirstDayM[i]++;
+                
+                let simHistoryForStreak = {0:[], 1:[], 2:[], 3:[]};
+                for(let d=0; d<days; d++) {
+                    let mPerson = -1, latePerson = -1;
+                    for(let i=0; i<4; i++) {
+                        let s = pat[(d+off[i])%4]; simHistoryForStreak[i].push(s);
+                        if(s === 'M') { mPerson = i; simStats.workDays[i]++; } 
+                        else if(s !== 'O') { latePerson = i; simStats.workDays[i]++; }
+                    }
+                    if(mPerson !== -1 && latePerson !== -1) simStats.pairs[mPerson+','+latePerson]++;
+                }
+                
+                let simStreaks = {work:{}, off:{}};
+                let hardPenalty = 0; 
+                
+                for(let i=0; i<4; i++) {
+                    let fullHist = currentHist[i].concat(simHistoryForStreak[i]);
+                    let strk = getStreakCounts(fullHist);
+                    simStreaks.work[i] = strk.workInst; 
+                    simStreaks.off[i] = strk.offInst;
+
+                    let currentWorkStreak = 0;
+                    let startIdx = Math.max(0, fullHist.length - 10);
+                    for(let j = startIdx; j < fullHist.length; j++) { 
+                        if (fullHist[j] !== 'O') {
+                            currentWorkStreak++;
+                            if (currentWorkStreak > 4) hardPenalty += 2000; 
+                        } else {
+                            currentWorkStreak = 0;
+                        }
+                    }
+                }
+
+                return hardPenalty + 
+                       (getStdDev(simStats.workDays) * 200) +   
+                       (getStdDev(simStreaks.work) * 100) +     
+                       (getStdDev(simStreaks.off) * 100) +      
+                       (getStdDev(simFirstDayM) * 100) +        
+                       (getStdDev(simStats.pairs) * 10);        
+            }
+
+            // --- Algorithm Core ---
+            const perms = getPermutations([0,1,2,3]);
+            const MAX_BRANCHES = 6; 
+
+            function miniSolve(m, y, currentStats, currentHist, depth, maxDepth) {
+                let works = Object.values(currentStats.workDays);
+                let isHoursEqual = works.length > 0 && works.every(val => val === works[0]);
+                if (isHoursEqual && depth > 0) return true;
+                if (depth >= maxDepth) return false;
+
+                let days = getDaysInMonth(y, m);
+                let pat = ['M', lsFuture, 'O', 'O'];
+                let candidates = perms.filter(off => {
+                    for(let i=0; i<4; i++) {
+                        let prev = currentHist[i][currentHist[i].length-1];
+                        if((prev==='N'||prev==='A') && pat[off[i]%4]==='M') return false;
+                    }
+                    return true;
+                });
+                candidates.sort((a, b) => scoreCandidate(a, m, y, currentStats, pat, currentHist, days) - scoreCandidate(b, m, y, currentStats, pat, currentHist, days));
+                candidates = candidates.slice(0, MAX_BRANCHES);
+
+                for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
+                    let off = candidates[cIdx];
+                    let newH = { 0: currentHist[0].slice(), 1: currentHist[1].slice(), 2: currentHist[2].slice(), 3: currentHist[3].slice() };
+                    let newS = {
+                        workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
+                        firstDayM: { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] },
+                        pairs: Object.assign({}, currentStats.pairs)
+                    };
+                    
+                    for(let d=0; d<days; d++) {
+                        for (let i = 0; i < 4; i++) {
+                            let s = pat[(d+off[i])%4]; newH[i].push(s);
+                            if(s === 'M') newS.workDays[i]++; else if(s !== 'O') newS.workDays[i]++;
+                        }
+                    }
+                    let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
+                    if(miniSolve(nextM, nextY, newS, newH, depth + 1, maxDepth)) return true;
+                }
+                return false;
+            }
+
+            function executeSolveExact(targetMonths, requireFutureProof) {
+                let last = historyBlocks[historyBlocks.length-1];
+                let curM = last.m + 1, curY = last.y; if(curM > 12){ curM=1; curY++; }
+                
+                let targetM = curM - 1, targetY = curY; 
+                for (let mk in allLocks) {
+                    let parts = mk.split('-'); let ly = parseInt(parts[0]); let lm = parseInt(parts[1]);
+                    if (ly > curY || (ly === curY && lm >= curM)) { if (ly > targetY || (ly === targetY && lm > targetM)) { targetY = ly; targetM = lm; } }
+                }
+
+                let results = [], baseH = buildBaseHistory(historyBlocks), baseS = calculateStats(baseH, historyBlocks);
+
+                function solve(m, y, currentStats, currentHist, depth) {
+                    let works = Object.values(currentStats.workDays);
+                    let isHoursEqual = works.length > 0 && works.every(val => val === works[0]);
+                    let passedTarget = (y > targetY || (y === targetY && m > targetM));
+
+                    if (depth === targetMonths) {
+                        if (passedTarget && isHoursEqual) {
+                            if (requireFutureProof) {
+                                let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
+                                return miniSolve(nextM, nextY, currentStats, currentHist, 0, 3);
+                            }
+                            return true;
+                        }
+                        return false;
+                    }
+                    if (depth > targetMonths) return false;
+
+                    let mk = y + '-' + String(m).padStart(2, '0'), days = getDaysInMonth(y, m);
+                    let pat = ['M', lsFuture, 'O', 'O'];
+
+                    let candidates = perms.filter(off => {
+                        for(let i=0; i<4; i++) {
+                            let prev = currentHist[i][currentHist[i].length-1];
+                            if((prev==='N'||prev==='A') && pat[off[i]%4]==='M') return false;
+                        }
+                        if(allLocks[mk]) {
+                            for(let i=0; i<4; i++) if(allLocks[mk][i]) {
+                                for(let d in allLocks[mk][i]) if(pat[(parseInt(d)-1+off[i])%4] !== allLocks[mk][i][d]) return false;
+                            }
+                        }
+                        return true;
+                    });
+
+                    candidates.sort((a, b) => scoreCandidate(a, m, y, currentStats, pat, currentHist, days) - scoreCandidate(b, m, y, currentStats, pat, currentHist, days));
+                    candidates = candidates.slice(0, MAX_BRANCHES);
+
+                    for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
+                        let off = candidates[cIdx];
+                        let newH = { 0: currentHist[0].slice(), 1: currentHist[1].slice(), 2: currentHist[2].slice(), 3: currentHist[3].slice() };
+                        let newS = {
+                            workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
+                            firstDayM: { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] },
+                            pairs: Object.assign({}, currentStats.pairs)
+                        };
+
+                        for(let i=0; i<4; i++) if(pat[off[i]%4]==='M') newS.firstDayM[i]++;
+                        
+                        for(let d=0; d<days; d++) {
+                            let mPerson = -1, latePerson = -1; 
+                            for (let i = 0; i < 4; i++) {
+                                let s = pat[(d+off[i])%4]; newH[i].push(s);
+                                if(s === 'M') { mPerson = i; newS.workDays[i]++; } 
+                                else if(s !== 'O') { latePerson = i; newS.workDays[i]++; }
+                            }
+                            if(mPerson !== -1 && latePerson !== -1) newS.pairs[mPerson+','+latePerson]++;
+                        }
+                        let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
+                        if(solve(nextM, nextY, newS, newH, depth + 1)) {
+                            let finalSnapshot = { 0: newH[0].slice(), 1: newH[1].slice(), 2: newH[2].slice(), 3: newH[3].slice() };
+                            results.push({m, y, days, off, ls: lsFuture, historySnapshot: finalSnapshot, statsAtEnd: newS});
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+
+                if (solve(curM, curY, baseS, baseH, 0)) {
+                    return results.reverse();
+                }
+                return null;
+            }
+
+            let finalRes = null;
+            for (let targetFutureMonths = 1; targetFutureMonths <= maxSearchLimit; targetFutureMonths++) {
+                let resNormal = executeSolveExact(targetFutureMonths, true);
+                if (resNormal) { finalRes = resNormal; break; }
+            }
+
+            if (!finalRes) {
+                for (let targetFutureMonths = 1; targetFutureMonths <= maxSearchLimit; targetFutureMonths++) {
+                    let resNormal = executeSolveExact(targetFutureMonths, false);
+                    if (resNormal) { finalRes = resNormal; break; }
+                }
+            }
+
+            postMessage({ status: finalRes ? 'SUCCESS' : 'FAIL', data: finalRes });
+        };
+    }
+
+    // --- Main Thread Execution ---
+    function generateFutureSchedule() {
+        if(historyBlocks.length === 0) return alert("กรุณาใส่ประวัติอย่างน้อย 1 เดือนก่อนครับ");
+        
+        const btn = document.getElementById('generateBtn');
+        const originalBtnText = btn.innerHTML;
+        
+        // อัปเดต UI ให้รู้ว่ากำลังโหลด (ปุ่มกดไม่ได้)
+        btn.innerHTML = '⏳ กำลังคำนวณแบบ Background...';
+        btn.disabled = true;
+
+        document.getElementById('resultStatus').innerHTML = "⏳ รอสักครู่... ระบบกำลังหาความเป็นไปได้ (หน้าจอไม่ค้างแล้ว)";
+        document.getElementById('resultStatus').style.color = "var(--warning)";
+        document.getElementById('outputSection').style.display = 'block';
+        document.getElementById('rosterActionContainer').style.display = 'none';
+        
+        // ซ่อนผลลัพธ์เก่าระหว่างรอ
+        document.getElementById('monthlyTables').innerHTML = '';
+        document.getElementById('finalPersonTable').querySelector('tbody').innerHTML = '';
+        document.getElementById('finalPairMatrixContainer').innerHTML = '';
+
+        // แปลงฟังก์ชัน Worker เป็น String เพื่อใช้งานแบบ Inline
+        const workerBlob = new Blob(['(' + rosterAlgorithmWorker.toString() + ')()'], { type: 'text/javascript' });
+        const worker = new Worker(URL.createObjectURL(workerBlob));
+
+        // ส่งข้อมูลให้ Worker คิด
+        worker.postMessage({
+            historyBlocks: historyBlocks,
+            allLocks: allLocks,
+            lsFuture: document.getElementById('lateShiftFuture').value,
+            maxSearchLimit: 24
+        });
+
+        // รับผลลัพธ์จาก Worker
+        worker.onmessage = function(e) {
+            btn.innerHTML = originalBtnText; // คืนค่าปุ่มเดิม
+            btn.disabled = false;
+            
+            const result = e.data;
+
+            if (result.status === 'SUCCESS') {
+                const finalRes = result.data;
+                let lastRes = finalRes[finalRes.length-1];
+                let works = Object.values(lastRes.statsAtEnd.workDays);
+                let isPerfect = works.every(val => val === works[0]);
+
+                window.generatedRoster = finalRes; 
+                document.getElementById('rosterActionContainer').style.display = 'flex'; 
+
+                let statusHTML = "";
+
+                if (isPerfect) {
+                    statusHTML = `✅ จัด Roster สำเร็จ! (ล่วงหน้า ${finalRes.length} เดือน)`;
+                    document.getElementById('resultStatus').style.color = "var(--success)";
+                } else {
+                    statusHTML = `⚠️ จัดผ่านวันล็อคสำเร็จ! แต่ชนขีดจำกัดสูงสุด ${finalRes.length} เดือน (ชั่วโมงอาจไม่เท่ากันเป๊ะ)`;
+                    document.getElementById('resultStatus').style.color = "var(--warning)";
+                }
+
+                document.getElementById('resultStatus').innerHTML = statusHTML;
+                renderTable('finalPersonTable', lastRes.historySnapshot, lastRes.statsAtEnd);
+                renderPairMatrix('finalPairMatrixContainer', lastRes.statsAtEnd);
+                renderFinalTables(finalRes);
+                
+                // เลื่อนหน้าจอลงไปดูผลลัพธ์อัตโนมัติ
+                document.getElementById('outputSection').scrollIntoView({ behavior: 'smooth' });
+
+            } else {
+                window.generatedRoster = [];
+                document.getElementById('resultStatus').innerHTML = "❌ ไม่สามารถจัดได้: วันที่ล็อคอาจขัดแย้งกับกฎ หรือไม่สามารถหาทางลงตัวได้ภายใน 12 เดือน";
+                document.getElementById('resultStatus').style.color = "var(--danger)";
+            }
+
+            worker.terminate(); // ปิด Worker เพื่อคืนหน่วยความจำให้ระบบ
+        };
     }
 </script>
 
