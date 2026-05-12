@@ -506,13 +506,22 @@
         reader.onload = function(e) {
             try {
                 const importedData = JSON.parse(e.target.result);
+                
+                if (!importedData || typeof importedData !== 'object' || (!importedData.persons && !importedData.historyBlocks && !importedData.allLocks)) {
+                    throw new Error("โครงสร้างไฟล์ JSON ไม่ถูกต้อง");
+                }
+
                 if (importedData.persons) { persons = importedData.persons; localStorage.setItem('shiftPersons', JSON.stringify(persons)); }
                 if (importedData.historyBlocks) { historyBlocks = importedData.historyBlocks; localStorage.setItem('shiftHistoryBlocks', JSON.stringify(historyBlocks)); }
                 if (importedData.allLocks) { allLocks = importedData.allLocks; localStorage.setItem('shiftLocksJSON', JSON.stringify(allLocks)); }
                 localStorage.removeItem('isClearedManually');
+                
                 alert("✅ นำเข้าข้อมูลสำเร็จ!");
                 refreshAllViews();
-            } catch (error) { alert("❌ เกิดข้อผิดพลาด! ไฟล์ข้อมูลไม่ถูกต้องหรือไม่สามารถอ่านได้"); }
+            } catch (error) { 
+                alert("❌ เกิดข้อผิดพลาด! ไฟล์ข้อมูลไม่ถูกต้อง หรือไม่ใช่ไฟล์แบ็คอัพของระบบ ROSTER"); 
+                console.error("Import Error:", error);
+            }
         };
         reader.readAsText(file);
         event.target.value = ''; 
@@ -731,8 +740,19 @@
         let cur = allLocks[mk][p][d] || '';
         let nxt = cycle[(cycle.indexOf(cur)+1)%4];
 
-        if(!nxt) { delete allLocks[mk][p][d]; } else {
-            if(nxt !== 'O') for(let i=0; i<4; i++) if(i !== p && allLocks[mk][i] && allLocks[mk][i][d] === nxt) delete allLocks[mk][i][d];
+        if(!nxt) { 
+            delete allLocks[mk][p][d]; 
+            if(Object.keys(allLocks[mk][p]).length === 0) delete allLocks[mk][p];
+            if(Object.keys(allLocks[mk]).length === 0) delete allLocks[mk];
+        } else {
+            if(nxt !== 'O') {
+                for(let i=0; i<4; i++) {
+                    if(i !== p && allLocks[mk][i] && allLocks[mk][i][d] === nxt) {
+                        delete allLocks[mk][i][d];
+                        if(Object.keys(allLocks[mk][i]).length === 0) delete allLocks[mk][i];
+                    }
+                }
+            }
             allLocks[mk][p][d] = nxt;
             let pat =['M', ls, 'O', 'O'], isPossible = false;
             for(let off=0; off<4; off++) {
@@ -742,7 +762,8 @@
             }
             if(!isPossible) allLocks[mk][p] = {[d]: nxt};
         }
-        localStorage.setItem('shiftLocksJSON', JSON.stringify(allLocks)); updateLockTableUI();
+        localStorage.setItem('shiftLocksJSON', JSON.stringify(allLocks)); 
+        updateLockTableUI();
     }
 
     function clearLocksForMonth() {
