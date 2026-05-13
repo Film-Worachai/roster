@@ -147,6 +147,9 @@
         }
         .fab-btn:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-3px); }
 
+        .bias-control-btn { padding: 1px 6px; font-size: 13px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-weight: bold; transition: 0.1s;}
+        .bias-control-btn:hover { color: var(--primary); background: #E2E8F0; border-radius: 4px; }
+
         @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .excel-table { font-size: 11px; } }
     </style>
 </head>
@@ -291,6 +294,15 @@
             </div>
             <div id="lockUiContainer" class="table-responsive" style="border: 1px solid var(--border);"></div>
         </div>
+        
+        <!-- ส่วนซ่อนโหมดตั้งค่าขั้นสูง -->
+        <div class="info-box mt-3" id="biasSectionWrapper" style="background: var(--card); border: 1px dashed var(--border); display: none;">
+            <div class="flex-between" style="margin-bottom: 15px;">
+                <span style="color: var(--warning-hover); font-weight: 600; font-size: 14px;">🎛️ ปรับน้ำหนักความน่าจะเป็นรายบุคคล</span>
+                <button class="btn-outline" style="padding: 4px 10px; font-size: 12px; border-color: #FCD34D; color: var(--warning-hover);" onclick="resetPrefsUI()">🔄 รีเซ็ตค่าปรับแต่ง</button>
+            </div>
+            <div id="biasTableContainer"></div>
+        </div>
 
         <button id="generateBtn" class="btn-success mt-3" onclick="generateFutureSchedule()">🚀 จัด ROSTER</button>
     </div>
@@ -335,6 +347,147 @@
     let historyBlocks =[]; 
     let allLocks = {};
     window.generatedRoster =[]; 
+
+    let userPreferences = {
+        0: { work3: 0, off3: 0, off4: 0, firstM: 0 },
+        1: { work3: 0, off3: 0, off4: 0, firstM: 0 },
+        2: { work3: 0, off3: 0, off4: 0, firstM: 0 },
+        3: { work3: 0, off3: 0, off4: 0, firstM: 0 },
+        pairs: {} 
+    };
+
+    let secretCode = "!VTCT";
+    let inputSequence = "";
+
+    document.addEventListener("keydown", function(e) {
+        if (e.key.length === 1) { 
+            inputSequence += e.key.toUpperCase(); 
+            
+            if (inputSequence.length > secretCode.length) {
+                inputSequence = inputSequence.slice(-secretCode.length);
+            }
+            
+            if (inputSequence === secretCode) {
+                const section = document.getElementById('biasSectionWrapper');
+                if (section.style.display === 'none') {
+                    section.style.display = 'block';
+                    alert('🔓 เปิดแล้ว');
+                } else {
+                    section.style.display = 'none';
+                    alert('🔒 ปิดแล้ว');
+                }
+                inputSequence = ""; 
+            }
+        }
+    });
+    // ==========================================================
+
+    function changePref(personIdx, key, delta) {
+        userPreferences[personIdx][key] += delta;
+        updatePreview();
+    }
+
+    function changePrefPair(mPerson, latePerson, delta) {
+        let key = `${mPerson},${latePerson}`;
+        if (!userPreferences.pairs[key]) userPreferences.pairs[key] = 0;
+        userPreferences.pairs[key] += delta;
+        updatePreview();
+    }
+
+    function resetPrefsUI() {
+        userPreferences = {
+            0: { work3: 0, off3: 0, off4: 0, firstM: 0 },
+            1: { work3: 0, off3: 0, off4: 0, firstM: 0 },
+            2: { work3: 0, off3: 0, off4: 0, firstM: 0 },
+            3: { work3: 0, off3: 0, off4: 0, firstM: 0 },
+            pairs: {}
+        };
+        updatePreview(); 
+    }
+
+    function renderBiasTable(baseH, baseS) {
+        const container = document.getElementById('biasTableContainer');
+        if (!container) return; 
+        
+        let htmlLeft = `<div class="table-responsive">
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th style="width: 120px;">พนักงาน</th>
+                        <th>ทำติด 3 วัน</th>
+                        <th>หยุดติด 3 วัน</th>
+                        <th>หยุดติด 4 วัน</th>
+                        <th>M วันที่ 1</th>
+                    </tr>
+                </thead>
+                <tbody style="font-weight: bold;">`;
+        
+        persons.forEach((p, i) => {
+            let streaks = getStreakCounts(baseH[i] ||[]);
+            let currentStats = { work3: streaks.work3Inst, off3: streaks.off3Inst, off4: streaks.off4Inst, firstM: baseS.firstDayM[i] };
+
+            htmlLeft += `<tr><td style="text-align: left; padding-left: 10px;">${escapeHTML(p)}</td>`;
+            
+            ['work3', 'off3', 'off4', 'firstM'].forEach(key => {
+                let val = userPreferences[i][key];
+                let color = val > 0 ? 'var(--success)' : (val < 0 ? 'var(--danger)' : '#CBD5E1');
+                let displayVal = val > 0 ? `+${val}` : val;
+                let currVal = currentStats[key] || 0;
+                
+                htmlLeft += `
+                <td style="padding: 4px; text-align: center;">
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                        <span style="font-size: 13px; color: var(--primary);">${currVal}</span>
+                        <div style="display: flex; align-items: center; background: #F8FAFC; border-radius: 4px; border: 1px solid #E2E8F0;">
+                            <button class="bias-control-btn" style="padding: 0 4px;" onclick="changePref(${i}, '${key}', -1)">-</button>
+                            <span style="font-size: 11px; width: 14px; text-align: center; color: ${color};">${displayVal}</span>
+                            <button class="bias-control-btn" style="padding: 0 4px;" onclick="changePref(${i}, '${key}', 1)">+</button>
+                        </div>
+                    </div>
+                </td>`;
+            });
+            htmlLeft += `</tr>`;
+        });
+        htmlLeft += `</tbody></table></div>`;
+
+        let htmlRight = `<div class="table-responsive">
+            <table class="matrix-table">
+                <thead><tr><th>M \\ A,N</th>`;
+        
+        persons.forEach(p => htmlRight += `<th>${escapeHTML(p).substring(0,3)}</th>`);
+        htmlRight += `</tr></thead><tbody style="font-weight: bold;">`;
+
+        persons.forEach((p, i) => {
+            htmlRight += `<tr><td>${escapeHTML(p).substring(0,3)}</td>`;
+            persons.forEach((p2, j) => {
+                if(i === j) {
+                    htmlRight += '<td style="background:var(--bg); color: var(--text-muted);">-</td>';
+                } else {
+                    let pairKey = `${i},${j}`;
+                    let val = userPreferences.pairs[pairKey] || 0;
+                    let currVal = baseS.pairs[pairKey] || 0;
+                    let color = val > 0 ? 'var(--success)' : (val < 0 ? 'var(--danger)' : '#CBD5E1');
+                    let displayVal = val > 0 ? `+${val}` : val;
+
+                    htmlRight += `
+                    <td style="padding: 4px;">
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                            <span style="font-size: 13px; color: var(--primary);">${currVal}</span>
+                            <div style="display: flex; align-items: center; background: #F8FAFC; border-radius: 4px; border: 1px solid #E2E8F0;">
+                                <button class="bias-control-btn" style="padding: 0 4px;" onclick="changePrefPair(${i}, ${j}, -1)">-</button>
+                                <span style="font-size: 11px; width: 14px; text-align: center; color: ${color};">${displayVal}</span>
+                                <button class="bias-control-btn" style="padding: 0 4px;" onclick="changePrefPair(${i}, ${j}, 1)">+</button>
+                            </div>
+                        </div>
+                    </td>`;
+                }
+            });
+            htmlRight += '</tr>';
+        });
+        htmlRight += `</tbody></table></div>`;
+
+        container.innerHTML = `<div class="grid-2">${htmlLeft}${htmlRight}</div>`;
+    }
 
     function escapeHTML(str) {
         return String(str).replace(/[&<>'"]/g, tag => ({
@@ -548,6 +701,7 @@
         let stats = calculateStats(baseH, historyBlocks);
         renderTable('histPersonTable', baseH, stats); 
         renderPairMatrix('histPairMatrixContainer', stats);
+        renderBiasTable(baseH, stats);
     }
 
     function addHistoryMonth() {
@@ -804,9 +958,22 @@
     }
 
     function calculateStats(h, blocks) {
-        let s = {workDays:{0:0,1:0,2:0,3:0}, firstDayM:{0:0,1:0,2:0,3:0}, pairs:{}, lateShifts:{0:0,1:0,2:0,3:0}};
+        let s = {
+            workDays:{0:0,1:0,2:0,3:0}, firstDayM:{0:0,1:0,2:0,3:0}, 
+            pairs:{}, lateShifts:{0:0,1:0,2:0,3:0},
+            streaks: { work3:{0:0,1:0,2:0,3:0}, off3:{0:0,1:0,2:0,3:0}, off4:{0:0,1:0,2:0,3:0} }
+        };
         for(let i=0; i<4; i++) for(let j=0; j<4; j++) if(i!==j) s.pairs[`${i},${j}`] = 0;
+        
         if(h[0].length === 0) return s;
+
+        for(let i=0; i<4; i++) {
+            let strk = getStreakCounts(h[i]);
+            s.streaks.work3[i] = strk.work3Inst;
+            s.streaks.off3[i] = strk.off3Inst;
+            s.streaks.off4[i] = strk.off4Inst;
+        }
+
         for(let d=0; d<h[0].length; d++) {
             let mPerson = -1, latePerson = -1;
             for(let i=0; i<4; i++) { 
@@ -918,10 +1085,10 @@
             document.getElementById('monthlyTables').innerHTML = '';
             document.getElementById('finalPersonTable').querySelector('tbody').innerHTML = '';
             document.getElementById('finalPairMatrixContainer').innerHTML = '';
-            window.generatedRoster = [];
+            window.generatedRoster =[];
 
+            resetPrefsUI(); 
             initializeUI(); 
-
         }
     }
 
@@ -930,7 +1097,7 @@
     // =======================================================
     function rosterAlgorithmWorker() {
         self.onmessage = function(e) {
-            const { historyBlocks, allLocks, lsFuture, maxSearchLimit } = e.data;
+            const { historyBlocks, allLocks, lsFuture, maxSearchLimit, userPreferences } = e.data; 
 
             const getDaysInMonth = (year, month) => new Date(year, month, 0).getDate();
             
@@ -947,9 +1114,22 @@
             }
 
             function calculateStats(h, blocks) {
-                let s = {workDays:{0:0,1:0,2:0,3:0}, firstDayM:{0:0,1:0,2:0,3:0}, pairs:{}, lateShifts:{0:0,1:0,2:0,3:0}};
+                let s = {
+                    workDays:{0:0,1:0,2:0,3:0}, firstDayM:{0:0,1:0,2:0,3:0}, 
+                    pairs:{}, lateShifts:{0:0,1:0,2:0,3:0},
+                    streaks: { work3:{0:0,1:0,2:0,3:0}, off3:{0:0,1:0,2:0,3:0}, off4:{0:0,1:0,2:0,3:0} }
+                };
                 for(let i=0; i<4; i++) for(let j=0; j<4; j++) if(i!==j) s.pairs[i+','+j] = 0;
+                
                 if(h[0].length === 0) return s;
+
+                for(let i=0; i<4; i++) {
+                    let strk = getStreakCounts(h[i]);
+                    s.streaks.work3[i] = strk.work3Inst;
+                    s.streaks.off3[i] = strk.off3Inst;
+                    s.streaks.off4[i] = strk.off4Inst;
+                }
+
                 for(let d=0; d<h[0].length; d++) {
                     let mPerson = -1, latePerson = -1;
                     for(let i=0; i<4; i++) { 
@@ -1044,22 +1224,24 @@
                 let totalOff4Streaks = 0; 
                 
                 for(let i=0; i<4; i++) {
-                    let fullHist = currentHist[i].concat(simHistoryForStreak[i]);
-                    let strk = getStreakCounts(fullHist);
+                    let tailLength = Math.min(4, currentHist[i].length);
+                    let tail = currentHist[i].slice(currentHist[i].length - tailLength);
+                    let evalHist = tail.concat(simHistoryForStreak[i]);
                     
-                    simStreaks.work3[i] = strk.work3Inst; 
-                    simStreaks.off3[i] = strk.off3Inst;
-                    simStreaks.off4[i] = strk.off4Inst;
+                    let newStrk = getStreakCounts(evalHist);
+                    let oldTailStrk = getStreakCounts(tail);
                     
-                    totalOff3Streaks += strk.off3Inst;
-                    totalOff4Streaks += strk.off4Inst;
+                    simStreaks.work3[i] = currentStats.streaks.work3[i] + (newStrk.work3Inst - oldTailStrk.work3Inst);
+                    simStreaks.off3[i] = currentStats.streaks.off3[i] + (newStrk.off3Inst - oldTailStrk.off3Inst);
+                    simStreaks.off4[i] = currentStats.streaks.off4[i] + (newStrk.off4Inst - oldTailStrk.off4Inst);
+                    
+                    totalOff3Streaks += (newStrk.off3Inst - oldTailStrk.off3Inst);
+                    totalOff4Streaks += (newStrk.off4Inst - oldTailStrk.off4Inst);
 
                     let currentWorkStreak = 0;
-                    let startIdx = Math.max(0, fullHist.length - 10);
-                    for(let j = startIdx; j < fullHist.length; j++) { 
-                        if (fullHist[j] !== 'O') {
+                    for(let j = 0; j < evalHist.length; j++) { 
+                        if (evalHist[j] !== 'O') {
                             currentWorkStreak++;
-
                             if (currentWorkStreak > 3) hardPenalty += 5000; 
                         } else {
                             currentWorkStreak = 0;
@@ -1067,16 +1249,37 @@
                     }
                 }
 
-                return hardPenalty + 
-                    (getStdDev(simStats.workDays) * 1500) +    // 1. ชั่วโมงต้องเป๊ะ
-                    (getStdDev(simStreaks.off4) * 450) +       // 2. หยุด 4 วัน สำคัญรองลงมา
-                    (getStdDev(simStreaks.off3) * 420) +       // 3. หยุด 3 วัน สำคัญตามมาติดๆ
+                let baseScore = hardPenalty + 
+                    (getStdDev(simStats.workDays) * 2000) +    // 1. ชั่วโมงต้องเป๊ะ (ให้ความสำคัญสุด)
+                    (getStdDev(simStreaks.off4) * 600) +       // 2. หยุด 4 วัน สำคัญรองลงมา
+                    (getStdDev(simStreaks.off3) * 450) +       // 3. หยุด 3 วัน 
                     (getStdDev(simFirstDayM) * 400) +          // 4. เปิดเดือนด้วย M           
                     (getStdDev(simStreaks.work3) * 350) +      // 5. ทำติด 3 วัน           
-                    (getStdDev(simStats.pairs) * 300) +        // 6. คู่เวร (ยอมให้คู่เวรเบี้ยวได้นิดหน่อย เพื่อรักษาวันหยุด)
+                    (getStdDev(simStats.pairs) * 300) +        // 6. คู่เวร 
                     (getStdDev(simStats.lateShifts) * 10) -    // 7. ไม่สนกะดึกเลย
-                    (totalOff4Streaks * 450) -                 // โบนัส
+                    (totalOff4Streaks * 500) -                 // โบนัส (ส่งเสริมให้มีหยุด 4 วัน)
                     (totalOff3Streaks * 300);                  // โบนัส
+
+                let biasScore = 0;
+                let BIAS_WEIGHT = 1500; 
+                if (userPreferences) {
+                    for (let i = 0; i < 4; i++) {
+                        let prefs = userPreferences[i];
+                        biasScore -= (prefs.work3 || 0) * simStreaks.work3[i] * BIAS_WEIGHT;
+                        biasScore -= (prefs.off3 || 0) * simStreaks.off3[i] * BIAS_WEIGHT;
+                        biasScore -= (prefs.off4 || 0) * simStreaks.off4[i] * BIAS_WEIGHT;
+                        biasScore -= (prefs.firstM || 0) * simFirstDayM[i] * BIAS_WEIGHT;
+                    }
+                    if (userPreferences.pairs) {
+                        for (let pairKey in userPreferences.pairs) {
+                            let val = userPreferences.pairs[pairKey];
+                            let actualCount = simStats.pairs[pairKey] || 0;
+                            biasScore -= val * actualCount * (BIAS_WEIGHT / 2); 
+                        }
+                    }
+                }
+
+                return baseScore + biasScore;
             }
 
             const perms = getPermutations([0,1,2,3]);
@@ -1107,7 +1310,8 @@
                         workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
                         firstDayM: { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] },
                         pairs: Object.assign({}, currentStats.pairs),
-                        lateShifts: { 0: currentStats.lateShifts[0], 1: currentStats.lateShifts[1], 2: currentStats.lateShifts[2], 3: currentStats.lateShifts[3] }
+                        lateShifts: { 0: currentStats.lateShifts[0], 1: currentStats.lateShifts[1], 2: currentStats.lateShifts[2], 3: currentStats.lateShifts[3] },
+                        streaks: { work3:{}, off3:{}, off4:{} }
                     };
                     
                     for(let d=0; d<days; d++) {
@@ -1120,6 +1324,14 @@
                             }
                         }
                     }
+
+                    for(let i=0; i<4; i++) {
+                        let strk = getStreakCounts(newH[i]);
+                        newS.streaks.work3[i] = strk.work3Inst;
+                        newS.streaks.off3[i] = strk.off3Inst;
+                        newS.streaks.off4[i] = strk.off4Inst;
+                    }
+
                     let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
                     if(miniSolve(nextM, nextY, newS, newH, depth + 1, maxDepth)) return true;
                 }
@@ -1181,7 +1393,8 @@
                             workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
                             firstDayM: { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] },
                             pairs: Object.assign({}, currentStats.pairs),
-                            lateShifts: { 0: currentStats.lateShifts[0], 1: currentStats.lateShifts[1], 2: currentStats.lateShifts[2], 3: currentStats.lateShifts[3] }
+                            lateShifts: { 0: currentStats.lateShifts[0], 1: currentStats.lateShifts[1], 2: currentStats.lateShifts[2], 3: currentStats.lateShifts[3] },
+                            streaks: { work3:{}, off3:{}, off4:{} }
                         };
 
                         for(let i=0; i<4; i++) if(pat[off[i]%4]==='M') newS.firstDayM[i]++;
@@ -1199,6 +1412,14 @@
                             }
                             if(mPerson !== -1 && latePerson !== -1) newS.pairs[mPerson+','+latePerson]++;
                         }
+
+                        for(let i=0; i<4; i++) {
+                            let strk = getStreakCounts(newH[i]);
+                            newS.streaks.work3[i] = strk.work3Inst;
+                            newS.streaks.off3[i] = strk.off3Inst;
+                            newS.streaks.off4[i] = strk.off4Inst;
+                        }
+
                         let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
                         if(solve(nextM, nextY, newS, newH, depth + 1)) {
                             let finalSnapshot = { 0: newH[0].slice(), 1: newH[1].slice(), 2: newH[2].slice(), 3: newH[3].slice() };
@@ -1259,7 +1480,8 @@
             historyBlocks: historyBlocks,
             allLocks: allLocks,
             lsFuture: document.getElementById('lateShiftFuture').value,
-            maxSearchLimit: 12
+            maxSearchLimit: 12,
+            userPreferences: userPreferences 
         });
 
         worker.onmessage = function(e) {
