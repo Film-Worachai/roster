@@ -157,6 +157,14 @@
         /* ========================================= */
         @media screen {
             .print-only { display: none !important; }
+            
+            /* เทคนิคสลับตำแหน่ง: หน้าจอปกติให้สถิติอยู่บน ตารางอยู่ล่าง */
+            #resultsWrapper {
+                display: flex;
+                flex-direction: column;
+            }
+            #monthlyTables { order: 2; }
+            #finalStatsContainer { order: 1; margin-bottom: 24px; }
         }
 
         @media print {
@@ -214,10 +222,11 @@
                 border-left: none !important; 
             }
 
-            /* จัดการขึ้นหน้าใหม่ (Page break) ให้ส่วนของสถิติ */
+            /* จัดการไม่ให้สถิติถูกตัดแหว่ง และให้เว้นระยะจากตารางด้านบนนิดหน่อย */
             #historyStatsSection, #finalStatsContainer {
-                page-break-before: always;
-                margin-top: 0 !important;
+                page-break-before: auto;
+                page-break-inside: avoid;
+                margin-top: 20px !important;
             }
 
             /* ------------------------------------- */
@@ -411,20 +420,23 @@
             </div>
         </div>
         
-        <!-- ตารางที่จัดเสร็จรายเดือน (ให้แสดงก่อนสถิติ) -->
-        <div id="monthlyTables"></div>
+        <!-- ใช้ Wrapper เพื่อสลับตำแหน่งบนหน้าจอ (สถิติอยู่บน) และกระดาษ (สถิติอยู่ล่าง) -->
+        <div id="resultsWrapper">
+            <!-- ตารางที่จัดเสร็จรายเดือน (DOM order: 1 จะอยู่บนสุดตอน Print) -->
+            <div id="monthlyTables"></div>
 
-        <!-- ส่วนสถิติอนาคต (ย้ายมาต่อท้ายตาราง) -->
-        <div class="card" id="finalStatsContainer" style="display: none; border-top: 5px solid var(--success);">
-            <h3 class="card-title no-print" style="margin-top: 0; margin-bottom: 15px; color: var(--success); font-size: 18px;">📊 สถิติสรุปตารางเวรล่วงหน้า</h3>
-            <div class="grid-2">
-                <div class="table-responsive">
-                    <table id="finalPersonTable">
-                        <thead><tr><th>NAME</th><th>ชั่วโมงรวม</th><th>ทำติดกัน 3 วัน</th><th>หยุดติดกัน 3 วัน</th><th>หยุดติดกัน 4 วัน</th><th>M วันที่ 1</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
+            <!-- ส่วนสถิติอนาคต (DOM order: 2 จะอยู่ล่างสุดตอน Print) -->
+            <div class="card" id="finalStatsContainer" style="display: none; border-top: 5px solid var(--success);">
+                <h3 class="card-title no-print" style="margin-top: 0; margin-bottom: 15px; color: var(--success); font-size: 18px;">📊 สถิติสรุปตารางเวรล่วงหน้า</h3>
+                <div class="grid-2">
+                    <div class="table-responsive">
+                        <table id="finalPersonTable">
+                            <thead><tr><th>NAME</th><th>ชั่วโมงรวม</th><th>ทำติดกัน 3 วัน</th><th>หยุดติดกัน 3 วัน</th><th>หยุดติดกัน 4 วัน</th><th>M วันที่ 1</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="table-responsive" id="finalPairMatrixContainer"></div>
                 </div>
-                <div class="table-responsive" id="finalPairMatrixContainer"></div>
             </div>
         </div>
     </div>
