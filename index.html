@@ -92,7 +92,7 @@
         
         .matrix-table th { background-color: #EFF6FF; color: #1E3A8A; }
         
-        .clickable-cell { cursor: pointer; user-select: none; font-weight: bold; transition: 0.1s; font-size: 12px;}
+        .clickable-cell { cursor: pointer; user-select: none; font-weight: bold; width: 25px; height: 25px; transition: 0.1s; border-radius: 4px; font-size: 12px;}
         .clickable-cell:hover { filter: brightness(0.95); transform: scale(1.1); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         
         .shift-M { background-color: #DBEAFE; color: #1E40AF; } 
@@ -115,20 +115,15 @@
         #outputSection { display: none; animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* ========================================= */
-        /* สไตล์ตารางรูปแบบ Excel (ป้องกันตารางความสูงไม่เท่ากัน) */
-        /* ========================================= */
+        /* สไตล์ตารางรูปแบบ Excel */
         .excel-table { 
             border-collapse: collapse; width: 100%; text-align: center; 
             font-size: 12px; font-family: 'Segoe UI', Arial, sans-serif; 
-            table-layout: fixed; /* บังคับให้ขนาดคอลัมน์คงที่และเฉลี่ยเท่าๆ กัน */
+            table-layout: auto; 
         }
         .excel-table th, .excel-table td { 
             border: 1px solid #000000 !important; 
-            padding: 4px 1px !important; 
-            height: 26px !important; /* บังคับความสูงของแถวให้เท่ากันทุกเดือน */
-            white-space: nowrap !important; /* ป้องกันข้อความหรือไอคอนตกลงมาบรรทัดใหม่ */
-            overflow: hidden !important; /* ซ่อนส่วนเกินไม่ให้ดันเซลล์ให้สูงขึ้น */
+            padding: 4px 2px !important; 
         }
         .excel-table th { background-color: #FFFFFF !important; font-weight: bold; color: #000; }
         .excel-table td { background-color: #FFFFFF; color: #000; }
@@ -210,6 +205,17 @@
                 overflow: visible !important;
             }
 
+            /* ปรับตารางให้สวยงามเมื่ออยู่บนกระดาษ */
+            .excel-table { 
+                width: 100% !important; 
+                font-size: 11pt !important; 
+                border-collapse: collapse !important; 
+            }
+            .excel-table th, .excel-table td { 
+                border: 1px solid #000 !important; 
+                padding: 5px !important; 
+            }
+            
             /* ป้องกันตารางถูกตัดกลางท่อนเมื่อขึ้นหน้าใหม่ */
             .card.table-responsive { 
                 page-break-inside: avoid; 
@@ -920,14 +926,14 @@
             <table id="${tableId}" class="excel-table">
                 <thead>
                     <tr>
-                        <th rowspan="2" style="width: 90px;">NAME</th>
+                        <th rowspan="2" style="width: 80px;">NAME</th>
                         <th rowspan="2" style="width: 30px;">Type</th>`;
                         
         for (let d = 1; d <= days; d++) {
             let dateObj = new Date(y, m - 1, d);
             let dayIdx = dateObj.getDay();
             let colorStyle = (dayIdx === 0 || dayIdx === 6) ? 'color: red; font-weight: bold;' : '';
-            html += `<th style="${colorStyle}">${dayNames[dayIdx]}</th>`;
+            html += `<th style="${colorStyle} width: 25px;">${dayNames[dayIdx]}</th>`;
         }
         html += `<th rowspan="2" style="width: 40px;">Total</th></tr><tr>`;
         
@@ -997,10 +1003,10 @@
     function updateLockTableUI() {
         let m = parseInt(document.getElementById('lockMonth').value), y = parseInt(document.getElementById('lockYear').value);
         let days = new Date(y, m, 0).getDate(), monthKey = `${y}-${String(m).padStart(2, '0')}`;
-        let html = `<table class="excel-table"><thead><tr><th style="width: 90px;">NAME</th>`;
+        let html = `<table class="excel-table"><thead><tr><th style="width: 100px;">NAME</th>`;
         for(let d=1; d<=days; d++) {
             let isWeekend = (new Date(y, m - 1, d).getDay() % 6 === 0);
-            html += `<th style="${isWeekend ? 'color: red;' : ''}">${d}</th>`;
+            html += `<th style="${isWeekend ? 'color: red;' : ''} width: 25px;">${d}</th>`;
         }
         html += `</tr></thead><tbody>`;
         persons.forEach((p, i) => {
