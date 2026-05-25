@@ -151,16 +151,107 @@
         .bias-control-btn:hover { color: var(--primary); background: #E2E8F0; border-radius: 4px; }
 
         @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .excel-table { font-size: 11px; } }
+
+        /* ========================================= */
+        /* CSS สำหรับการพิมพ์ (Save as PDF) จากเบราว์เซอร์ */
+        /* ========================================= */
+        @media screen {
+            .print-only { display: none !important; }
+        }
+
+        @media print {
+            @page { 
+                size: A4 landscape; /* บังคับเป็นแนวนอนตอน Print */
+                margin: 10mm; 
+            }
+            
+            body { 
+                background: #ffffff !important; 
+                color: #000000 !important;
+                margin: 0; padding: 0; 
+            }
+
+            /* บังคับให้เบราว์เซอร์พิมพ์สีพื้นหลัง (Background Graphics) */
+            * { 
+                -webkit-print-color-adjust: exact !important; 
+                print-color-adjust: exact !important; 
+            }
+
+            /* ซ่อนปุ่ม และองค์ประกอบที่ไม่จำเป็นต้องอยู่ใน PDF แบบสมบูรณ์ */
+            button, input, select, .action-group, .fab-container, .header, 
+            .grid-controls, .bias-control-btn, .info-box, 
+            #importFileInput, .no-print {
+                display: none !important;
+            }
+
+            /* ลบเงาและขอบตารางที่หนาเทอะทะออกให้สะอาดที่สุด */
+            .card {
+                box-shadow: none !important;
+                border: none !important;
+                margin: 0 0 20px 0 !important;
+                padding: 0 !important;
+                background: transparent !important;
+            }
+
+            .table-responsive {
+                overflow: visible !important;
+            }
+
+            /* ปรับตารางให้สวยงามเมื่ออยู่บนกระดาษ */
+            .excel-table { 
+                width: 100% !important; 
+                font-size: 11pt !important; 
+                border-collapse: collapse !important; 
+            }
+            .excel-table th, .excel-table td { 
+                border: 1px solid #000 !important; 
+                padding: 5px !important; 
+            }
+            
+            /* ป้องกันตารางถูกตัดกลางท่อนเมื่อขึ้นหน้าใหม่ */
+            .card.table-responsive { 
+                page-break-inside: avoid; 
+                border-left: none !important; 
+            }
+
+            /* จัดการขึ้นหน้าใหม่ (Page break) ให้ส่วนของสถิติ */
+            #historyStatsSection, #finalStatsContainer {
+                page-break-before: always;
+                margin-top: 0 !important;
+            }
+
+            /* ------------------------------------- */
+            /* Logic สำหรับควบคุมการ Print แยก 2 ส่วน */
+            /* ------------------------------------- */
+            /* 1. กรณีปริ้นต์ประวัติย้อนหลัง (ซ่อนส่วนการจัดล่วงหน้า) */
+            body.print-history #section-lock-manage,
+            body.print-history #outputSection {
+                display: none !important;
+            }
+
+            /* 2. กรณีปริ้นต์ตารางสำเร็จ (ซ่อนส่วนประวัติ) */
+            body.print-generated #section-history-manage,
+            body.print-generated #savedHistoryTablesContainer,
+            body.print-generated #historyStatsSection,
+            body.print-generated #section-lock-manage {
+                display: none !important;
+            }
+
+            /* บังคับให้แสดงผลลัพธ์การจัดแม้ในจอมือถือจะปิดอยู่ */
+            body.print-generated #outputSection {
+                display: block !important;
+            }
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="header">
+    <div class="header no-print">
         <h1>🏥 ROSTER</h1>
     </div>
 
-    <div class="card" style="border-top: 5px solid var(--primary);">
+    <div class="card no-print" id="section-history-manage" style="border-top: 5px solid var(--primary);">
         <div class="flex-between" style="margin-bottom: 20px;">
             <h3 class="card-title" style="color: var(--primary); margin: 0;">📂 1. จัดการประวัติเวรย้อนหลัง</h3>
             <div class="action-group">
@@ -169,6 +260,7 @@
                 <button class="btn-outline" style="color: var(--warning); border-color: #FCD34D; padding: 6px 12px; font-size: 12px;" onclick="document.getElementById('importFileInput').click()">📂 นำเข้าข้อมูล</button>
                 <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="importDataJSON(event)">
                 <button class="btn-outline" style="color: var(--danger); border-color: #FCA5A5; padding: 6px 12px; font-size: 12px;" onclick="clearDatabase()">🗑️ ล้างทั้งหมด</button>
+                <button class="btn-outline" style="color: #059669; border-color: #34D399; padding: 6px 12px; font-size: 12px; font-weight: bold;" onclick="printSection('history')">🖨️ พิมพ์ / Save PDF</button>
             </div>
         </div>
         
@@ -251,10 +343,12 @@
         </div>
     </div>
 
+    <!-- ส่วนตารางประวัติย้อนหลัง -->
     <div id="savedHistoryTablesContainer"></div>
 
+    <!-- ส่วนสถิติประวัติย้อนหลัง -->
     <div class="card" id="historyStatsSection">
-        <h3 class="card-title">📊 สถิติสะสมจากประวัติ</h3>
+        <h3 class="card-title no-print">📊 สถิติสะสมจากประวัติ</h3>
         <div class="grid-2">
             <div class="table-responsive">
                 <table id="histPersonTable">
@@ -266,7 +360,7 @@
         </div>
     </div>
 
-    <div class="card" style="border-top: 5px solid var(--success);">
+    <div class="card no-print" id="section-lock-manage" style="border-top: 5px solid var(--success);">
         <h3 class="card-title" style="color: var(--success);">✨ 2. วางแผนล็อคเวร</h3>
         
         <div class="grid-controls" style="background: #F0FDF4; padding: 18px; border-radius: 10px; border: 1px solid #BBF7D0;">
@@ -306,32 +400,37 @@
         <button id="generateBtn" class="btn-success mt-3" onclick="generateFutureSchedule()">🚀 จัด ROSTER</button>
     </div>
 
+    <!-- ส่วนผลลัพธ์การจัด Roster สำเร็จ -->
     <div id="outputSection">
-        <div class="card">
+        <div class="card no-print" id="outputSectionCard">
             <h2 id="resultStatus" style="text-align:center; font-weight: 700; margin-top: 0; font-size: 20px;"></h2>
             
-            <div class="mt-3" id="rosterActionContainer" style="display: none; background: #ECFDF5; padding: 15px 20px; border-radius: 10px; border: 1px solid #A7F3D0; justify-content: center; align-items: center;">
+            <div class="mt-3" id="rosterActionContainer" style="display: none; background: #ECFDF5; padding: 15px 20px; border-radius: 10px; border: 1px solid #A7F3D0; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <button class="btn-success" style="width: auto; padding: 10px 20px; font-size: 14px; border-radius: 8px; box-shadow: 0 4px 6px rgba(16,185,129,0.2);" onclick="commitRosterToHistory()">📥 เพิ่มไปยังประวัติเวร</button>
+                <button class="btn-outline" style="color: #059669; border-color: #059669; padding: 10px 20px; font-size: 14px; border-radius: 8px; background: white;" onclick="printSection('generated')">🖨️ พิมพ์ / Save PDF</button>
             </div>
-
-            <div id="finalStatsContainer" style="display: none;">
-                <div class="grid-2 mt-3">
-                    <div class="table-responsive">
-                        <table id="finalPersonTable">
-                            <thead><tr><th>NAME</th><th>ชั่วโมงรวม</th><th>ทำติดกัน 3 วัน</th><th>หยุดติดกัน 3 วัน</th><th>หยุดติดกัน 4 วัน</th><th>M วันที่ 1</th></tr></thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                    <div class="table-responsive" id="finalPairMatrixContainer"></div>
-                </div>
-            </div>
-
         </div>
+        
+        <!-- ตารางที่จัดเสร็จรายเดือน (ให้แสดงก่อนสถิติ) -->
         <div id="monthlyTables"></div>
+
+        <!-- ส่วนสถิติอนาคต (ย้ายมาต่อท้ายตาราง) -->
+        <div class="card" id="finalStatsContainer" style="display: none; border-top: 5px solid var(--success);">
+            <h3 class="card-title no-print" style="margin-top: 0; margin-bottom: 15px; color: var(--success); font-size: 18px;">📊 สถิติสรุปตารางเวรล่วงหน้า</h3>
+            <div class="grid-2">
+                <div class="table-responsive">
+                    <table id="finalPersonTable">
+                        <thead><tr><th>NAME</th><th>ชั่วโมงรวม</th><th>ทำติดกัน 3 วัน</th><th>หยุดติดกัน 3 วัน</th><th>หยุดติดกัน 4 วัน</th><th>M วันที่ 1</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="table-responsive" id="finalPairMatrixContainer"></div>
+            </div>
+        </div>
     </div>
 </div>
 
-<div class="fab-container">
+<div class="fab-container no-print">
     <button class="fab-btn" onclick="window.scrollTo({ top: 0, behavior: 'smooth' })" title="เลื่อนขึ้นบนสุด">⬆️</button>
     <button class="fab-btn" onclick="window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })" title="เลื่อนลงล่างสุด">⬇️</button>
 </div>
@@ -379,6 +478,31 @@
             }
         }
     });
+
+    // ==========================================================
+    // ฟังก์ชันสั่ง Print จาก Browser (แยกเป็น 2 ส่วนชัดเจนผ่าน Class CSS)
+    // ==========================================================
+    function printSection(type) {
+        if (type === 'history' && historyBlocks.length === 0) {
+            alert("❌ ไม่มีข้อมูลประวัติเวร");
+            return;
+        }
+        if (type === 'generated' && (!window.generatedRoster || window.generatedRoster.length === 0)) {
+            alert("❌ ยังไม่ได้สร้างตารางเวรล่วงหน้า");
+            return;
+        }
+
+        // เพิ่ม Class ลงใน body เพื่อบอก CSS ว่าตอนนี้เราจะพิมพ์หมวดไหน
+        document.body.classList.add(`print-${type}`);
+
+        // รอให้ Browser คำนวณ CSS ใหม่สักพัก แล้วจึงสั่งเรียก Dialog
+        setTimeout(() => {
+            window.print();
+            
+            // ลบ Class ออกเมื่อพิมพ์เสร็จ หรือกดยกเลิก
+            document.body.classList.remove(`print-${type}`);
+        }, 300);
+    }
     // ==========================================================
 
     function changePref(personIdx, key, delta) {
@@ -785,7 +909,7 @@
                 <h3 style="margin:0; font-size: 16px; display: flex; align-items: center; gap: 8px; color: var(--text-main);">
                     📅 ${headerText} <span style="font-size: 14px; color: var(--text-muted); font-weight: 600;">(M${ls})</span>
                 </h3>
-                <button class="btn-success" style="width: auto; padding: 6px 14px; font-size: 12px; border-radius: 6px;" onclick="copyTableToExcel('${tableId}')">📋 Copy</button>
+                <button class="btn-success no-print" style="width: auto; padding: 6px 14px; font-size: 12px; border-radius: 6px;" onclick="copyTableToExcel('${tableId}')">📋 Copy</button>
             </div>
             <table id="${tableId}" class="excel-table">
                 <thead>
