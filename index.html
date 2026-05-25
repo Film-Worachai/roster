@@ -295,7 +295,6 @@
             <div id="lockUiContainer" class="table-responsive" style="border: 1px solid var(--border);"></div>
         </div>
         
-        <!-- ส่วนซ่อนโหมดตั้งค่าขั้นสูง -->
         <div class="info-box mt-3" id="biasSectionWrapper" style="background: var(--card); border: 1px dashed var(--border); display: none;">
             <div class="flex-between" style="margin-bottom: 15px;">
                 <span style="color: var(--warning-hover); font-weight: 600; font-size: 14px;">🎛️ ปรับน้ำหนักความน่าจะเป็นรายบุคคล</span>
@@ -432,7 +431,7 @@
                 let val = userPreferences[i][key];
                 let color = val > 0 ? 'var(--success)' : (val < 0 ? 'var(--danger)' : '#CBD5E1');
                 let displayVal = val > 0 ? `+${val}` : val;
-                let currVal = currentStats[key] || 0;
+                let currVal = Number(currentStats[key] || 0).toLocaleString();
                 
                 htmlLeft += `
                 <td style="padding: 4px; text-align: center;">
@@ -454,18 +453,18 @@
             <table class="matrix-table">
                 <thead><tr><th>M \\ A,N</th>`;
         
-        persons.forEach(p => htmlRight += `<th>${escapeHTML(p).substring(0,3)}</th>`);
+        persons.forEach(p => htmlRight += `<th>${escapeHTML(p)}</th>`);
         htmlRight += `</tr></thead><tbody style="font-weight: bold;">`;
 
         persons.forEach((p, i) => {
-            htmlRight += `<tr><td>${escapeHTML(p).substring(0,3)}</td>`;
+            htmlRight += `<tr><td style="text-align: left; padding-left: 10px;">${escapeHTML(p)}</td>`;
             persons.forEach((p2, j) => {
                 if(i === j) {
                     htmlRight += '<td style="background:var(--bg); color: var(--text-muted);">-</td>';
                 } else {
                     let pairKey = `${i},${j}`;
                     let val = userPreferences.pairs[pairKey] || 0;
-                    let currVal = baseS.pairs[pairKey] || 0;
+                    let currVal = Number(baseS.pairs[pairKey] || 0).toLocaleString();
                     let color = val > 0 ? 'var(--success)' : (val < 0 ? 'var(--danger)' : '#CBD5E1');
                     let displayVal = val > 0 ? `+${val}` : val;
 
@@ -839,7 +838,7 @@
                 let s = historySnap[i][startIndex+d];
                 html += `<td>${s !== 'O' ? '12' : ''}</td>`;
             }
-            html += `<td style="font-weight:bold;">${totalHours}</td></tr>`;
+            html += `<td style="font-weight:bold;">${Number(totalHours).toLocaleString()}</td></tr>`;
         });
         
         html += `</tbody></table></div>`;
@@ -1024,11 +1023,12 @@
         const tbody = document.querySelector(`#${id} tbody`); tbody.innerHTML = '';
         
         const fDiff = (nv, ov) => {
-            if (ov == null) return nv;
+            let fmtNv = Number(nv).toLocaleString();
+            if (ov == null) return fmtNv;
             let d = nv - ov;
-            if (d > 0) return `${nv} <span style="color: var(--success); font-size: 0.9em; font-weight: normal;">(+${d})</span>`;
-            if (d < 0) return `${nv} <span style="color: var(--danger); font-size: 0.9em; font-weight: normal;">(${d})</span>`;
-            return nv;
+            if (d > 0) return `${fmtNv} <span style="color: var(--success); font-size: 0.9em; font-weight: normal;">(+${Number(d).toLocaleString()})</span>`;
+            if (d < 0) return `${fmtNv} <span style="color: var(--danger); font-size: 0.9em; font-weight: normal;">(${Number(d).toLocaleString()})</span>`;
+            return fmtNv;
         };
 
         persons.forEach((p, i) => {
@@ -1048,19 +1048,20 @@
 
     function renderPairMatrix(id, s, baseS = null) {
         let html = '<table class="matrix-table"><thead><tr><th>M \\ A,N</th>';
-        persons.forEach(p => html += `<th>${escapeHTML(p).substring(0,3)}</th>`);
+        persons.forEach(p => html += `<th>${escapeHTML(p)}</th>`);
         html += '</tr></thead><tbody style="font-weight: bold;">';
         
         const fDiff = (nv, ov) => {
-            if (ov == null) return nv;
+            let fmtNv = Number(nv).toLocaleString();
+            if (ov == null) return fmtNv;
             let d = nv - ov;
-            if (d > 0) return `${nv} <span style="color: var(--success); font-size: 0.9em; font-weight: normal;">(+${d})</span>`;
-            if (d < 0) return `${nv} <span style="color: var(--danger); font-size: 0.9em; font-weight: normal;">(${d})</span>`;
-            return nv;
+            if (d > 0) return `${fmtNv} <span style="color: var(--success); font-size: 0.9em; font-weight: normal;">(+${Number(d).toLocaleString()})</span>`;
+            if (d < 0) return `${fmtNv} <span style="color: var(--danger); font-size: 0.9em; font-weight: normal;">(${Number(d).toLocaleString()})</span>`;
+            return fmtNv;
         };
 
         persons.forEach((p, i) => {
-            html += `<tr><td>${escapeHTML(p).substring(0,3)}</td>`;
+            html += `<tr><td style="text-align: left; padding-left: 10px;">${escapeHTML(p)}</td>`;
             persons.forEach((p2, j) => {
                 if(i === j) html += '<td style="background:var(--bg); color: var(--text-muted);">-</td>';
                 else html += `<td>${fDiff(s.pairs[`${i},${j}`]||0, baseS ? (baseS.pairs[`${i},${j}`]||0) : null)}</td>`;
