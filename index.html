@@ -352,10 +352,8 @@
         </div>
     </div>
 
-    <!-- ส่วนตารางประวัติย้อนหลัง -->
     <div id="savedHistoryTablesContainer"></div>
 
-    <!-- ส่วนสถิติประวัติย้อนหลัง -->
     <div class="card" id="historyStatsSection">
         <h3 class="card-title no-print">📊 สถิติสะสมจากประวัติ</h3>
         <div class="grid-2">
@@ -409,7 +407,6 @@
         <button id="generateBtn" class="btn-success mt-3" onclick="generateFutureSchedule()">🚀 จัด ROSTER</button>
     </div>
 
-    <!-- ส่วนผลลัพธ์การจัด Roster สำเร็จ -->
     <div id="outputSection">
         <div class="card no-print" id="outputSectionCard">
             <h2 id="resultStatus" style="text-align:center; font-weight: 700; margin-top: 0; font-size: 20px;"></h2>
@@ -420,12 +417,9 @@
             </div>
         </div>
         
-        <!-- ใช้ Wrapper เพื่อสลับตำแหน่งบนหน้าจอ (สถิติอยู่บน) และกระดาษ (สถิติอยู่ล่าง) -->
         <div id="resultsWrapper">
-            <!-- ตารางที่จัดเสร็จรายเดือน (DOM order: 1 จะอยู่บนสุดตอน Print) -->
             <div id="monthlyTables"></div>
 
-            <!-- ส่วนสถิติอนาคต (DOM order: 2 จะอยู่ล่างสุดตอน Print) -->
             <div class="card" id="finalStatsContainer" style="display: none; border-top: 5px solid var(--success);">
                 <h3 class="card-title no-print" style="margin-top: 0; margin-bottom: 15px; color: var(--success); font-size: 18px;">📊 สถิติสรุปตารางเวรล่วงหน้า</h3>
                 <div class="grid-2">
@@ -955,7 +949,18 @@
                 <td>R</td>`;
             for(let d=0; d<days; d++) {
                 let s = historySnap[i][startIndex+d];
-                let displayShift = s === 'O' ? 'OS1' : s; 
+                
+                let displayShift = s;
+                if (s === 'O') {
+                    displayShift = 'OS01';
+                } else if (s === 'M') {
+                    displayShift = (ls === 'A') ? 'M004' : 'M001';
+                } else if (s === 'A') {
+                    displayShift = 'A008';
+                } else if (s === 'N') {
+                    displayShift = 'N003';
+                }
+
                 let cellStyle = '';
                 if(s === 'M') cellStyle = 'background-color: #FFE699;'; 
                 else if(s !== 'O') cellStyle = 'background-color: #B4C6E7;'; 
@@ -1547,7 +1552,7 @@
                                     newS.lateShifts[i]++; 
                                 }
                             }
-                            if(mPerson !== -1 && latePerson !== -1) newS.pairs[mPerson+','+latePerson]++;
+                            if(mPerson !== -1 && latePerson !== -1) newS.pairs[mPerson+latePerson]++;
                         }
 
                         for(let i=0; i<4; i++) {
