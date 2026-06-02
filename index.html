@@ -952,13 +952,17 @@
                 
                 let displayShift = s;
                 if (s === 'O') {
-                    displayShift = 'OS01';
+                    // displayShift = 'OS01';
+                    displayShift = 'OS';
                 } else if (s === 'M') {
-                    displayShift = (ls === 'A') ? 'M004' : 'M001';
+                    // displayShift = (ls === 'A') ? 'M004' : 'M001';
+                    displayShift = (ls === 'A') ? 'M' : 'M';
                 } else if (s === 'A') {
-                    displayShift = 'A008';
+                    // displayShift = 'A008';
+                    displayShift = 'A';
                 } else if (s === 'N') {
-                    displayShift = 'N003';
+                    // displayShift = 'N003';
+                    displayShift = 'N';
                 }
 
                 let cellStyle = '';
