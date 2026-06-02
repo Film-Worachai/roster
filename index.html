@@ -214,6 +214,13 @@
             .excel-table th, .excel-table td { 
                 border: 1px solid #000 !important; 
                 padding: 5px !important; 
+                color: #000000 !important; /* บังคับตัวหนังสือเป็นสีดำทั้งหมดตอนพิมพ์ */
+            }
+            .lock-icon {
+                display: none !important; /* ซ่อนไอคอนกุญแจตอนสั่งพิมพ์ */
+            }
+            .is-locked-generated {
+                font-weight: normal !important; /* ยกเลิกตัวหนาสำหรับช่องที่ล็อคไว้ตอนสั่งพิมพ์ */
             }
             
             /* ป้องกันตารางถูกตัดกลางท่อนเมื่อขึ้นหน้าใหม่ */
@@ -970,13 +977,15 @@
                 else if(s !== 'O') cellStyle = 'background-color: #B4C6E7;'; 
                 
                 let lockIconHTML = '';
+                let printClass = '';
                 if (isFuture && monthKeyForLocks) {
                     if (allLocks[monthKeyForLocks] && allLocks[monthKeyForLocks][i] && allLocks[monthKeyForLocks][i][d+1]) {
                         lockIconHTML = '<span class="lock-icon" style="color: #059669; font-weight: normal; font-size: 10px;"> 🔒</span>'; 
                         cellStyle += ' font-weight: bold; color: #059669;'; 
+                        printClass = 'is-locked-generated';
                     }
                 }
-                html += `<td style="${cellStyle}">${displayShift}${lockIconHTML}</td>`;
+                html += `<td class="${printClass}" style="${cellStyle}">${displayShift}${lockIconHTML}</td>`;
             }
             html += `<td></td></tr><tr><td>W</td>`;
             for(let d=0; d<days; d++) {
