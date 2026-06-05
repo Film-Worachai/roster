@@ -643,7 +643,7 @@
     function getFullMonthText(m, y) {
         let be = parseInt(y) + 543;
         let mm = String(m).padStart(2, '0');
-        return `${mm} ${monthNamesTH[m]} พ.ศ. ${be} ${monthNamesEN[m]} ${y}`;
+        return `${mm}. ${monthNamesTH[m]} ${be} - ${monthNamesEN[m]} ${y}`;
     }
 
     function getShortMonthText(m, y) {
