@@ -1274,7 +1274,7 @@
                     pairs:{}, lateShifts:{0:0,1:0,2:0,3:0},
                     streaks: { work3:{0:0,1:0,2:0,3:0}, off3:{0:0,1:0,2:0,3:0}, off4:{0:0,1:0,2:0,3:0} }
                 };
-                for(let i=0; i<4; i++) for(let j=0; j<4; j++) if(i!==j) s.pairs[i+','+j] = 0;
+                for(let i=0; i<4; i++) for(let j=0; j<4; j++) if(i!==j) s.pairs[`${i},${j}`] = 0;
                 
                 if(h[0].length === 0) return s;
 
@@ -1296,7 +1296,7 @@
                             s.lateShifts[i]++;  
                         }
                     }
-                    if(mPerson !== -1 && latePerson !== -1) s.pairs[mPerson+','+latePerson]++;
+                    if(mPerson !== -1 && latePerson !== -1) s.pairs[`${mPerson},${latePerson}`]++;
                 }
                 for(let b=0; b<blocks.length; b++) { 
                     let block = blocks[b];
@@ -1370,7 +1370,7 @@
                             simStats.lateShifts[i]++; 
                         }
                     }
-                    if(mPerson !== -1 && latePerson !== -1) simStats.pairs[mPerson+','+latePerson]++;
+                    if(mPerson !== -1 && latePerson !== -1) simStats.pairs[`${mPerson},${latePerson}`]++;
                 }
                 
                 let simStreaks = {work3:{}, off3:{}, off4:{}};
@@ -1470,14 +1470,17 @@
                     };
                     
                     for(let d=0; d<days; d++) {
+                        let mPerson = -1, latePerson = -1;
                         for (let i = 0; i < 4; i++) {
                             let s = pat[(d+off[i])%4]; newH[i].push(s);
-                            if(s === 'M') { newS.workDays[i]++; } 
+                            if(s === 'M') { mPerson = i; newS.workDays[i]++; } 
                             else if(s !== 'O') { 
+                                latePerson = i;
                                 newS.workDays[i]++; 
                                 newS.lateShifts[i]++; 
                             }
                         }
+                        if(mPerson !== -1 && latePerson !== -1) newS.pairs[`${mPerson},${latePerson}`]++;
                     }
 
                     for(let i=0; i<4; i++) {
@@ -1565,7 +1568,7 @@
                                     newS.lateShifts[i]++; 
                                 }
                             }
-                            if(mPerson !== -1 && latePerson !== -1) newS.pairs[mPerson+latePerson]++;
+                            if(mPerson !== -1 && latePerson !== -1) newS.pairs[`${mPerson},${latePerson}`]++;
                         }
 
                         for(let i=0; i<4; i++) {
