@@ -214,7 +214,6 @@
             .excel-table th, .excel-table td { 
                 border: 1px solid #000 !important; 
                 padding: 5px !important; 
-                color: #000000 !important; /* บังคับตัวหนังสือเป็นสีดำทั้งหมดตอนพิมพ์ */
             }
             .lock-icon {
                 display: none !important; /* ซ่อนไอคอนกุญแจตอนสั่งพิมพ์ */
@@ -920,7 +919,7 @@
         <div class="card table-responsive" style="border-top: none; border-left: 5px solid ${borderColor}; padding: 15px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h3 style="margin:0; font-size: 16px; display: flex; align-items: center; gap: 8px; color: var(--text-main);">
-                    📅 ${headerText} <span style="font-size: 14px; color: var(--text-muted); font-weight: 600;">(M${ls})</span>
+                    📅 ${headerText} <span class="no-print" style="font-size: 14px; color: var(--text-muted); font-weight: 600;">(M${ls})</span>
                 </h3>
                 <button class="btn-success no-print" style="width: auto; padding: 6px 14px; font-size: 12px; border-radius: 6px;" onclick="copyTableToExcel('${tableId}')">📋 Copy</button>
             </div>
@@ -933,7 +932,7 @@
         for (let d = 1; d <= days; d++) {
             let dateObj = new Date(y, m - 1, d);
             let dayIdx = dateObj.getDay();
-            let colorStyle = (dayIdx === 0 || dayIdx === 6) ? 'color: red; font-weight: bold;' : '';
+            let colorStyle = (dayIdx === 0 || dayIdx === 6) ? 'color: red !important; font-weight: bold;' : '';
             html += `<th style="${colorStyle} width: 25px;">${dayNames[dayIdx]}</th>`;
         }
         html += `<th rowspan="2" style="width: 40px;">Total</th></tr><tr>`;
@@ -941,7 +940,7 @@
         for (let d = 1; d <= days; d++) {
             let dateObj = new Date(y, m - 1, d);
             let dayIdx = dateObj.getDay();
-            let colorStyle = (dayIdx === 0 || dayIdx === 6) ? 'color: red; font-weight: bold;' : '';
+            let colorStyle = (dayIdx === 0 || dayIdx === 6) ? 'color: red !important; font-weight: bold;' : '';
             html += `<th style="${colorStyle}">${d}</th>`;
         }
         html += `</tr></thead><tbody>`;
@@ -1024,7 +1023,7 @@
         let html = `<table class="excel-table"><thead><tr><th style="width: 100px;">NAME</th>`;
         for(let d=1; d<=days; d++) {
             let isWeekend = (new Date(y, m - 1, d).getDay() % 6 === 0);
-            html += `<th style="${isWeekend ? 'color: red;' : ''} width: 25px;">${d}</th>`;
+            html += `<th style="${isWeekend ? 'color: red !important;' : ''} width: 25px;">${d}</th>`;
         }
         html += `</tr></thead><tbody>`;
         persons.forEach((p, i) => {
