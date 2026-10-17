@@ -388,7 +388,10 @@
             </div>
             <div class="form-group">
                 <label style="color: var(--success-hover);">กะดึก</label>
-                <select id="lateShiftFuture" onchange="updateLockTableUI()"><option value="N">N</option><option value="A">A</option></select>
+                <select id="lateShiftFuture" onchange="onChangeLateShiftFuture()">
+                    <option value="N">N</option>
+                    <option value="A">A</option>
+                </select>
             </div>
         </div>
 
@@ -449,15 +452,15 @@
 </div>
 
 <script>
-    const monthNamesTH =["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
-    const monthNamesEN =["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    const dayNames =['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const monthNamesTH = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+    const monthNamesEN = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const monthNamesTHShort = ["", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 
-    let persons =['KOMKRIT', 'NATTHAPOL', 'KONCHANOK', 'WORACHAI'];
-    let historyBlocks =[]; 
+    let persons = ['KOMKRIT', 'NATTHAPOL', 'KONCHANOK', 'WORACHAI'];
+    let historyBlocks = []; 
     let allLocks = {};
-    window.generatedRoster =[]; 
+    window.generatedRoster = []; 
 
     let userPreferences = {
         0: { work3: 0, off3: 0, off4: 0, firstM: 0 },
@@ -559,7 +562,7 @@
                 <tbody style="font-weight: bold;">`;
         
         persons.forEach((p, i) => {
-            let streaks = getStreakCounts(baseH[i] ||[]);
+            let streaks = getStreakCounts(baseH[i] || []);
             let currentStats = { work3: streaks.work3Inst, off3: streaks.off3Inst, off4: streaks.off4Inst, firstM: baseS.firstDayM[i] };
 
             htmlLeft += `<tr><td style="text-align: left; padding-left: 10px;">${escapeHTML(p)}</td>`;
@@ -844,12 +847,22 @@
         let m = parseInt(document.getElementById('inputMonth').value);
         let y = parseInt(document.getElementById('inputYear').value);
         let ls = document.getElementById('lateShiftHist').value;
-        let offsets =[0,1,2,3].map(i => parseInt(document.getElementById('pattern'+i).value));
+        let offsets = [0,1,2,3].map(i => parseInt(document.getElementById('pattern'+i).value));
         
         if (new Set(offsets).size !== 4) return alert("รูปแบบเวรซ้ำกัน !");
 
         if (historyBlocks.length > 0) {
             let prevBlock = historyBlocks[historyBlocks.length - 1];
+            
+            // ตรวจสอบความต่อเนื่องของเดือนและปี
+            let expectedM = prevBlock.m + 1;
+            let expectedY = prevBlock.y;
+            if (expectedM > 12) { expectedM = 1; expectedY++; }
+
+            if (m !== expectedM || y !== expectedY) {
+                return alert(`❌ กรุณาเพิ่มประวัติเรียงตามลำดับเดือน!\nเดือนถัดไปที่ต้องบันทึกคือ ${getFullMonthText(expectedM, expectedY)}`);
+            }
+
             let prevPat = ['M', prevBlock.lateShift, 'O', 'O'];
             let newPat = ['M', ls, 'O', 'O'];
             
@@ -963,7 +976,7 @@
                     displayShift = 'OS';
                 } else if (s === 'M') {
                     // displayShift = (ls === 'A') ? 'M004' : 'M001';
-                    displayShift = (ls === 'A') ? 'M' : 'M';
+                    displayShift = 'M';
                 } else if (s === 'A') {
                     // displayShift = 'A008';
                     displayShift = 'A';
@@ -1003,7 +1016,7 @@
         const container = document.getElementById('savedHistoryTablesContainer');
         container.innerHTML = '';
         historyBlocks.forEach(b => {
-            let pat =['M', b.lateShift, 'O', 'O'];
+            let pat = ['M', b.lateShift, 'O', 'O'];
             let snap = {0:[], 1:[], 2:[], 3:[]};
             for(let i=0; i<4; i++) for(let d=0; d<b.days; d++) snap[i].push(pat[(d+b.offsets[i])%4]);
             container.innerHTML += generateExcelStyleHTML(b.m, b.y, b.days, b.lateShift, snap, false, null);
@@ -1016,6 +1029,27 @@
             let mk = `${r.y}-${String(r.m).padStart(2,'0')}`;
             c.innerHTML += generateExcelStyleHTML(r.m, r.y, r.days, r.ls, r.historySnapshot, true, mk);
         });
+    }
+
+    function onChangeLateShiftFuture() {
+        let newLs = document.getElementById('lateShiftFuture').value;
+        let hasChanged = false;
+
+        // ซิงค์สัญลักษณ์กะดึก (N <-> A) ในตารางล็อคเวรล่วงหน้าทั้งหมดให้ตรงกับที่เลือก
+        for (let mk in allLocks) {
+            for (let p in allLocks[mk]) {
+                for (let d in allLocks[mk][p]) {
+                    if (allLocks[mk][p][d] === 'N' || allLocks[mk][p][d] === 'A') {
+                        allLocks[mk][p][d] = newLs;
+                        hasChanged = true;
+                    }
+                }
+            }
+        }
+        if (hasChanged) {
+            localStorage.setItem('shiftLocksJSON', JSON.stringify(allLocks));
+        }
+        updateLockTableUI();
     }
 
     function updateLockTableUI() {
@@ -1040,7 +1074,7 @@
 
     function toggleLock(mk, p, d) {
         const ls = document.getElementById('lateShiftFuture').value;
-        const cycle =['', 'M', ls, 'O'];
+        const cycle = ['', 'M', ls, 'O'];
         if(!allLocks[mk]) allLocks[mk] = {}; 
         if(!allLocks[mk][p]) allLocks[mk][p] = {};
         
@@ -1061,7 +1095,7 @@
                 }
             }
             allLocks[mk][p][d] = nxt;
-            let pat =['M', ls, 'O', 'O'], isPossible = false;
+            let pat = ['M', ls, 'O', 'O'], isPossible = false;
             for(let off=0; off<4; off++) {
                 let valid = true;
                 for(let day in allLocks[mk][p]) if(pat[(parseInt(day)-1+off)%4] !== allLocks[mk][p][day]) { valid = false; break; }
@@ -1186,7 +1220,7 @@
         };
 
         persons.forEach((p, i) => {
-            let streaks = getStreakCounts(histObj[i] ||[]);
+            let streaks = getStreakCounts(histObj[i] || []);
             let baseStreaks = baseHistObj ? getStreakCounts(baseHistObj[i] || []) : null;
 
             tbody.innerHTML += `<tr style="font-weight: bold;">
@@ -1240,7 +1274,7 @@
             document.getElementById('monthlyTables').innerHTML = '';
             document.getElementById('finalPersonTable').querySelector('tbody').innerHTML = '';
             document.getElementById('finalPairMatrixContainer').innerHTML = '';
-            window.generatedRoster =[];
+            window.generatedRoster = [];
 
             resetPrefsUI(); 
             initializeUI(); 
@@ -1340,7 +1374,7 @@
 
             function getPermutations(arr) {
                 if (arr.length <= 1) return [arr];
-                let res =[];
+                let res = [];
                 for (let i = 0; i < arr.length; i++) {
                     let rest = getPermutations([...arr.slice(0, i), ...arr.slice(i + 1)]);
                     for (let j = 0; j < rest.length; j++) res.push([arr[i], ...rest[j]]);
@@ -1632,7 +1666,8 @@
         document.getElementById('finalPairMatrixContainer').innerHTML = '';
 
         const workerBlob = new Blob(['(' + rosterAlgorithmWorker.toString() + ')()'], { type: 'text/javascript' });
-        const worker = new Worker(URL.createObjectURL(workerBlob));
+        const workerUrl = URL.createObjectURL(workerBlob);
+        const worker = new Worker(workerUrl);
 
         worker.postMessage({
             historyBlocks: historyBlocks,
@@ -1641,6 +1676,16 @@
             maxSearchLimit: 12,
             userPreferences: userPreferences 
         });
+
+        worker.onerror = function(err) {
+            console.error("Worker Error:", err);
+            btn.innerHTML = originalBtnText;
+            btn.disabled = false;
+            document.getElementById('resultStatus').innerHTML = "❌ เกิดข้อผิดพลาดในการประมวลผล";
+            document.getElementById('resultStatus').style.color = "var(--danger)";
+            URL.revokeObjectURL(workerUrl);
+            worker.terminate();
+        };
 
         worker.onmessage = function(e) {
             btn.innerHTML = originalBtnText; 
@@ -1685,6 +1730,7 @@
                 document.getElementById('resultStatus').style.color = "var(--danger)";
             }
 
+            URL.revokeObjectURL(workerUrl);
             worker.terminate(); 
         };
     }
