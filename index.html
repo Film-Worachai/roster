@@ -115,6 +115,43 @@
         #outputSection { display: none; animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
+        /* สไตล์สำหรับ Progress Bar */
+        .progress-wrapper {
+            max-width: 520px;
+            margin: 15px auto 5px auto;
+            display: none;
+        }
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+        .progress-track {
+            width: 100%;
+            height: 12px;
+            background-color: #E2E8F0;
+            border-radius: 999px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary), var(--success));
+            border-radius: 999px;
+            transition: width 0.2s ease-out;
+        }
+        .progress-detail {
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
         /* สไตล์ตารางรูปแบบ Excel */
         .excel-table { 
             border-collapse: collapse; width: 100%; text-align: center; 
@@ -421,6 +458,18 @@
         <div class="card no-print" id="outputSectionCard">
             <h2 id="resultStatus" style="text-align:center; font-weight: 700; margin-top: 0; font-size: 20px;"></h2>
             
+            <!-- แถบแสดงความคืบหน้า (Progress Bar) -->
+            <div id="progressContainer" class="progress-wrapper">
+                <div class="progress-header">
+                    <span id="progressStageText">กำลังประมวลผลสมองกล Beam Search...</span>
+                    <span id="progressPercentText" style="color: var(--primary);">0%</span>
+                </div>
+                <div class="progress-track">
+                    <div id="progressBarFill" class="progress-fill"></div>
+                </div>
+                <div id="progressDetailText" class="progress-detail">เตรียมพร้อมข้อมูล...</div>
+            </div>
+
             <div class="mt-3" id="rosterActionContainer" style="display: none; background: #ECFDF5; padding: 15px 20px; border-radius: 10px; border: 1px solid #A7F3D0; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <button class="btn-success" style="width: auto; padding: 10px 20px; font-size: 14px; border-radius: 8px; box-shadow: 0 4px 6px rgba(16,185,129,0.2);" onclick="commitRosterToHistory()">📥 เพิ่มไปยังประวัติเวร</button>
                 <button class="btn-outline" style="color: #059669; border-color: #059669; padding: 10px 20px; font-size: 14px; border-radius: 8px; background: white;" onclick="printSection('generated')">🖨️ พิมพ์ / Save PDF</button>
@@ -508,14 +557,10 @@
             return;
         }
 
-        // เพิ่ม Class ลงใน body เพื่อบอก CSS ว่าตอนนี้เราจะพิมพ์หมวดไหน
         document.body.classList.add(`print-${type}`);
 
-        // รอให้ Browser คำนวณ CSS ใหม่สักพัก แล้วจึงสั่งเรียก Dialog
         setTimeout(() => {
             window.print();
-            
-            // ลบ Class ออกเมื่อพิมพ์เสร็จ หรือกดยกเลิก
             document.body.classList.remove(`print-${type}`);
         }, 300);
     }
@@ -854,7 +899,6 @@
         if (historyBlocks.length > 0) {
             let prevBlock = historyBlocks[historyBlocks.length - 1];
             
-            // ตรวจสอบความต่อเนื่องของเดือนและปี
             let expectedM = prevBlock.m + 1;
             let expectedY = prevBlock.y;
             if (expectedM > 12) { expectedM = 1; expectedY++; }
@@ -972,16 +1016,12 @@
                 
                 let displayShift = s;
                 if (s === 'O') {
-                    // displayShift = 'OS01';
                     displayShift = 'OS';
                 } else if (s === 'M') {
-                    // displayShift = (ls === 'A') ? 'M004' : 'M001';
                     displayShift = 'M';
                 } else if (s === 'A') {
-                    // displayShift = 'A008';
                     displayShift = 'A';
                 } else if (s === 'N') {
-                    // displayShift = 'N003';
                     displayShift = 'N';
                 }
 
@@ -1035,7 +1075,6 @@
         let newLs = document.getElementById('lateShiftFuture').value;
         let hasChanged = false;
 
-        // ซิงค์สัญลักษณ์กะดึก (N <-> A) ในตารางล็อคเวรล่วงหน้าทั้งหมดให้ตรงกับที่เลือก
         for (let mk in allLocks) {
             for (let p in allLocks[mk]) {
                 for (let d in allLocks[mk][p]) {
@@ -1282,14 +1321,24 @@
     }
 
     // =======================================================
-    // 🧠 THE WEB WORKER: จัดการอัลกอริทึมที่หนักหน่วงแบบ Background
+    // 🧠 THE UPGRADED WEB WORKER: Global Beam Search + O(1) Math Engine
     // =======================================================
     function rosterAlgorithmWorker() {
-        self.onmessage = function(e) {
+        self.onmessage = async function(e) {
             const { historyBlocks, allLocks, lsFuture, maxSearchLimit, userPreferences } = e.data; 
 
             const getDaysInMonth = (year, month) => new Date(year, month, 0).getDate();
-            
+            const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+            function reportProgress(percent, stage, detail) {
+                self.postMessage({
+                    status: 'PROGRESS',
+                    percent: Math.min(100, Math.max(0, Math.round(percent))),
+                    stage: stage,
+                    detail: detail
+                });
+            }
+
             function buildBaseHistory(blocks) {
                 let h = {0:[], 1:[], 2:[], 3:[]};
                 for (let b = 0; b < blocks.length; b++) {
@@ -1302,6 +1351,31 @@
                 return h;
             }
 
+            const getStreakCounts = (historyArray) => {
+                let work3Inst = 0, workOver3Inst = 0, off3Inst = 0, off4Inst = 0;
+                let wStreak = 0, oStreak = 0;
+                for (let i = 0; i < historyArray.length; i++) {
+                    let s = historyArray[i];
+                    if (s !== 'O') {
+                        wStreak++;
+                        if (oStreak === 3) off3Inst++;
+                        else if (oStreak >= 4) off4Inst++;
+                        oStreak = 0;
+                    } else {
+                        oStreak++;
+                        if (wStreak === 3) work3Inst++;
+                        else if (wStreak > 3) workOver3Inst++;
+                        wStreak = 0;
+                    }
+                }
+                if (oStreak === 3) off3Inst++;
+                else if (oStreak >= 4) off4Inst++;
+                if (wStreak === 3) work3Inst++;
+                else if (wStreak > 3) workOver3Inst++;
+
+                return { work3Inst, workOver3Inst, off3Inst, off4Inst };
+            };
+
             function calculateStats(h, blocks) {
                 let s = {
                     workDays:{0:0,1:0,2:0,3:0}, firstDayM:{0:0,1:0,2:0,3:0}, 
@@ -1309,7 +1383,6 @@
                     streaks: { work3:{0:0,1:0,2:0,3:0}, off3:{0:0,1:0,2:0,3:0}, off4:{0:0,1:0,2:0,3:0} }
                 };
                 for(let i=0; i<4; i++) for(let j=0; j<4; j++) if(i!==j) s.pairs[`${i},${j}`] = 0;
-                
                 if(h[0].length === 0) return s;
 
                 for(let i=0; i<4; i++) {
@@ -1347,31 +1420,6 @@
                 return Math.sqrt(variance);
             }
 
-            const getStreakCounts = (historyArray) => {
-                let work3Inst = 0, workOver3Inst = 0, off3Inst = 0, off4Inst = 0;
-                let wStreak = 0, oStreak = 0;
-                for (let i = 0; i < historyArray.length; i++) {
-                    let s = historyArray[i];
-                    if (s !== 'O') {
-                        wStreak++;
-                        if (oStreak === 3) off3Inst++;
-                        else if (oStreak >= 4) off4Inst++;
-                        oStreak = 0;
-                    } else {
-                        oStreak++;
-                        if (wStreak === 3) work3Inst++;
-                        else if (wStreak > 3) workOver3Inst++;
-                        wStreak = 0;
-                    }
-                }
-                if (oStreak === 3) off3Inst++;
-                else if (oStreak >= 4) off4Inst++;
-                if (wStreak === 3) work3Inst++;
-                else if (wStreak > 3) workOver3Inst++;
-
-                return { work3Inst, workOver3Inst, off3Inst, off4Inst };
-            };
-
             function getPermutations(arr) {
                 if (arr.length <= 1) return [arr];
                 let res = [];
@@ -1382,266 +1430,330 @@
                 return res;
             }
 
-            function scoreCandidate(off, m, y, currentStats, pat, currentHist, days) {
-                let simStats = { 
-                    workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
-                    pairs: Object.assign({}, currentStats.pairs),
-                    lateShifts: { 0: currentStats.lateShifts[0], 1: currentStats.lateShifts[1], 2: currentStats.lateShifts[2], 3: currentStats.lateShifts[3] }
+            const perms = getPermutations([0,1,2,3]);
+            const pat = ['M', lsFuture, 'O', 'O'];
+
+            // =========================================================================
+            // ⚡ O(1) Mathematical State Transition (ไม่ต้องวนลูปรายวันและไม่ต้องก๊อปปี้ Array)
+            // =========================================================================
+            function transitionStateO1(state, m, y, days, off, baseTotalOff3, baseTotalOff4) {
+                // 1. ตรวจสอบรอยต่อข้ามเดือน (ห้ามกะดึกวันสุดท้าย ชนกะเช้าวันที่ 1)
+                for (let i = 0; i < 4; i++) {
+                    let prevLastShift = state.last2[i][1];
+                    let firstShift = pat[off[i] % 4];
+                    if ((prevLastShift === 'N' || prevLastShift === 'A') && firstShift === 'M') {
+                        return null;
+                    }
+                }
+
+                let newStats = {
+                    workDays: { 0: state.stats.workDays[0], 1: state.stats.workDays[1], 2: state.stats.workDays[2], 3: state.stats.workDays[3] },
+                    firstDayM: { 0: state.stats.firstDayM[0], 1: state.stats.firstDayM[1], 2: state.stats.firstDayM[2], 3: state.stats.firstDayM[3] },
+                    lateShifts: { 0: state.stats.lateShifts[0], 1: state.stats.lateShifts[1], 2: state.stats.lateShifts[2], 3: state.stats.lateShifts[3] },
+                    pairs: Object.assign({}, state.stats.pairs),
+                    streaks: {
+                        work3: { 0: state.stats.streaks.work3[0], 1: state.stats.streaks.work3[1], 2: state.stats.streaks.work3[2], 3: state.stats.streaks.work3[3] },
+                        off3: { 0: state.stats.streaks.off3[0], 1: state.stats.streaks.off3[1], 2: state.stats.streaks.off3[2], 3: state.stats.streaks.off3[3] },
+                        off4: { 0: state.stats.streaks.off4[0], 1: state.stats.streaks.off4[1], 2: state.stats.streaks.off4[2], 3: state.stats.streaks.off4[3] }
+                    }
                 };
-                let simFirstDayM = { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] };
-                
-                for(let i=0; i<4; i++) if(pat[off[i]%4]==='M') simFirstDayM[i]++;
-                
-                let simHistoryForStreak = {0:[], 1:[], 2:[], 3:[]};
-                for(let d=0; d<days; d++) {
+
+                // 2. อัปเดตสถิติ M วันที่ 1
+                for (let i = 0; i < 4; i++) {
+                    if (pat[off[i] % 4] === 'M') newStats.firstDayM[i]++;
+                }
+
+                // 3. คำนวณชั่วโมงทำงาน กะดึก และคู่เวรทั้งเดือนใน 4 จังหวะ (O(1))
+                let fullCycles = Math.floor(days / 4);
+                let rem = days % 4;
+                for (let dMod = 0; dMod < 4; dMod++) {
+                    let count = fullCycles + (dMod < rem ? 1 : 0);
                     let mPerson = -1, latePerson = -1;
-                    for(let i=0; i<4; i++) {
-                        let s = pat[(d+off[i])%4]; simHistoryForStreak[i].push(s);
-                        if(s === 'M') { mPerson = i; simStats.workDays[i]++; } 
-                        else if(s !== 'O') { 
-                            latePerson = i; 
-                            simStats.workDays[i]++; 
-                            simStats.lateShifts[i]++; 
-                        }
+                    for (let i = 0; i < 4; i++) {
+                        let sIdx = (dMod + off[i]) % 4;
+                        if (sIdx === 0) mPerson = i;
+                        else if (sIdx === 1) latePerson = i;
                     }
-                    if(mPerson !== -1 && latePerson !== -1) simStats.pairs[`${mPerson},${latePerson}`]++;
-                }
-                
-                let simStreaks = {work3:{}, off3:{}, off4:{}};
-                let hardPenalty = 0; 
-                let totalOff3Streaks = 0; 
-                let totalOff4Streaks = 0; 
-                
-                for(let i=0; i<4; i++) {
-                    let tailLength = Math.min(4, currentHist[i].length);
-                    let tail = currentHist[i].slice(currentHist[i].length - tailLength);
-                    let evalHist = tail.concat(simHistoryForStreak[i]);
-                    
-                    let newStrk = getStreakCounts(evalHist);
-                    let oldTailStrk = getStreakCounts(tail);
-                    
-                    simStreaks.work3[i] = currentStats.streaks.work3[i] + (newStrk.work3Inst - oldTailStrk.work3Inst);
-                    simStreaks.off3[i] = currentStats.streaks.off3[i] + (newStrk.off3Inst - oldTailStrk.off3Inst);
-                    simStreaks.off4[i] = currentStats.streaks.off4[i] + (newStrk.off4Inst - oldTailStrk.off4Inst);
-                    
-                    totalOff3Streaks += (newStrk.off3Inst - oldTailStrk.off3Inst);
-                    totalOff4Streaks += (newStrk.off4Inst - oldTailStrk.off4Inst);
-
-                    let currentWorkStreak = 0;
-                    for(let j = 0; j < evalHist.length; j++) { 
-                        if (evalHist[j] !== 'O') {
-                            currentWorkStreak++;
-                            if (currentWorkStreak > 3) hardPenalty += 5000; 
-                        } else {
-                            currentWorkStreak = 0;
-                        }
-                    }
+                    newStats.workDays[mPerson] += count;
+                    newStats.workDays[latePerson] += count;
+                    newStats.lateShifts[latePerson] += count;
+                    newStats.pairs[`${mPerson},${latePerson}`] += count;
                 }
 
-                let baseScore = hardPenalty + 
-                    (getStdDev(simStats.workDays) * 2000) +    // 1. ชั่วโมงต้องเป๊ะ (ให้ความสำคัญสุด)
-                    (getStdDev(simStreaks.off4) * 600) +       // 2. หยุด 4 วัน สำคัญรองลงมา
-                    (getStdDev(simStreaks.off3) * 450) +       // 3. หยุด 3 วัน 
-                    (getStdDev(simFirstDayM) * 400) +          // 4. เปิดเดือนด้วย M           
-                    (getStdDev(simStreaks.work3) * 350) +      // 5. ทำติด 3 วัน           
-                    (getStdDev(simStats.pairs) * 300) +        // 6. คู่เวร 
-                    (getStdDev(simStats.lateShifts) * 10) -    // 7. ไม่สนกะดึกเลย
-                    (totalOff4Streaks * 500) -                 // โบนัส (ส่งเสริมให้มีหยุด 4 วัน)
-                    (totalOff3Streaks * 300);                  // โบนัส
+                // 4. คำนวณวันทำติด/หยุดติดจากรอยต่อ 4 วัน (2 วันท้ายเดือนเก่า + 2 วันแรกเดือนใหม่)
+                let newLast2 = [];
+                let newWorkOver3Count = state.workOver3Count;
+
+                for (let i = 0; i < 4; i++) {
+                    let w0 = state.last2[i][0] !== 'O';
+                    let w1 = state.last2[i][1] !== 'O';
+                    let w2 = pat[off[i] % 4] !== 'O';
+                    let w3 = pat[(off[i] + 1) % 4] !== 'O';
+
+                    // เช็คทำติดกันที่รอยต่อ
+                    if (w0 && w1 && w2 && w3) {
+                        newWorkOver3Count++;
+                    } else if ((!w0 && w1 && w2 && w3) || (w0 && w1 && w2 && !w3)) {
+                        newStats.streaks.work3[i]++;
+                    }
+
+                    // เช็คหยุดติดกันที่รอยต่อ
+                    if (!w0 && !w1 && !w2 && !w3) {
+                        newStats.streaks.off4[i]++;
+                    } else if ((w0 && !w1 && !w2 && !w3) || (!w0 && !w1 && !w2 && w3)) {
+                        newStats.streaks.off3[i]++;
+                    }
+
+                    newLast2.push([
+                        pat[(days - 2 + off[i]) % 4],
+                        pat[(days - 1 + off[i]) % 4]
+                    ]);
+                }
+
+                // 5. คำนวณคะแนนความยุติธรรมรวม (Global Score)
+                let totalOff3Gained = (newStats.streaks.off3[0] + newStats.streaks.off3[1] + newStats.streaks.off3[2] + newStats.streaks.off3[3]) - baseTotalOff3;
+                let totalOff4Gained = (newStats.streaks.off4[0] + newStats.streaks.off4[1] + newStats.streaks.off4[2] + newStats.streaks.off4[3]) - baseTotalOff4;
+                let hardPenalty = newWorkOver3Count * 5000;
+
+                // ปรับสเกลค่าน้ำหนักให้สมดุลกับจำนวนครั้งที่เกิดจริงต่อเดือน
+                let baseScore = hardPenalty +
+                    (getStdDev(newStats.workDays) * 2500) +     // 1. ชั่วโมงทำงานสำคัญที่สุด (ขยับ ~1,000+ คะแนน)
+                    (getStdDev(newStats.streaks.off4) * 800) +  // 2. ความเท่าเทียมวันหยุด 4 วัน (ขยับ ~346 คะแนน)
+                    (getStdDev(newStats.streaks.off3) * 600) +  // 3. ความเท่าเทียมวันหยุด 3 วัน (ขยับ ~260 คะแนน)
+                    (getStdDev(newStats.firstDayM) * 500) +     // 4. ความเท่าเทียม M วันที่ 1 (ขยับ ~216 คะแนน)
+                    (getStdDev(newStats.streaks.work3) * 450) + // 5. ความเท่าเทียมทำติด 3 วัน (ขยับ ~195 คะแนน)
+                    (getStdDev(newStats.pairs) * 45) +          // 6. คู่เวร (หารสเกล 7.5 รอบ/เดือน ลงมา เหลือขยับ ~100-140 คะแนน)
+                    (getStdDev(newStats.lateShifts) * 10) -     // 7. กะดึก (ใช้เป็นตัวตัดสินกรณีคะแนนเท่ากัน)
+                    (totalOff4Gained * 120) -                   // โบนัสหยุด 4 วัน (ต้องน้อยกว่า 346 เพื่อไม่ให้คนเดียวเหมาซ้ำ)
+                    (totalOff3Gained * 80);                     // โบนัสหยุด 3 วัน (ต้องน้อยกว่า 260 เพื่อไม่ให้คนเดียวเหมาซ้ำ)
 
                 let biasScore = 0;
-                let BIAS_WEIGHT = 1500; 
+                let BIAS_WEIGHT = 1500;
                 if (userPreferences) {
                     for (let i = 0; i < 4; i++) {
                         let prefs = userPreferences[i];
-                        biasScore -= (prefs.work3 || 0) * simStreaks.work3[i] * BIAS_WEIGHT;
-                        biasScore -= (prefs.off3 || 0) * simStreaks.off3[i] * BIAS_WEIGHT;
-                        biasScore -= (prefs.off4 || 0) * simStreaks.off4[i] * BIAS_WEIGHT;
-                        biasScore -= (prefs.firstM || 0) * simFirstDayM[i] * BIAS_WEIGHT;
+                        biasScore -= (prefs.work3 || 0) * newStats.streaks.work3[i] * BIAS_WEIGHT;
+                        biasScore -= (prefs.off3 || 0) * newStats.streaks.off3[i] * BIAS_WEIGHT;
+                        biasScore -= (prefs.off4 || 0) * newStats.streaks.off4[i] * BIAS_WEIGHT;
+                        biasScore -= (prefs.firstM || 0) * newStats.firstDayM[i] * BIAS_WEIGHT;
                     }
                     if (userPreferences.pairs) {
                         for (let pairKey in userPreferences.pairs) {
                             let val = userPreferences.pairs[pairKey];
-                            let actualCount = simStats.pairs[pairKey] || 0;
-                            biasScore -= val * actualCount * (BIAS_WEIGHT / 2); 
+                            let actualCount = newStats.pairs[pairKey] || 0;
+                            biasScore -= val * actualCount * (BIAS_WEIGHT / 2);
                         }
                     }
                 }
 
-                return baseScore + biasScore;
+                return {
+                    stats: newStats,
+                    last2: newLast2,
+                    workOver3Count: newWorkOver3Count,
+                    score: baseScore + biasScore,
+                    path: state.path.concat([{ m, y, days, off, ls: lsFuture }])
+                };
             }
 
-            const perms = getPermutations([0,1,2,3]);
-            const MAX_BRANCHES = 8; 
-
-            function miniSolve(m, y, currentStats, currentHist, depth, maxDepth) {
-                let works = Object.values(currentStats.workDays);
-                let isHoursEqual = works.length > 0 && works.every(val => val === works[0]);
+            // ฟังก์ชันมองการณ์ไกล (Future-Proof Lookahead) แบบ O(1)
+            function canFutureProofO1(m, y, state, depth, maxDepth, baseTotalOff3, baseTotalOff4) {
+                let works = Object.values(state.stats.workDays);
+                let isHoursEqual = works.every(val => val === works[0]);
                 if (isHoursEqual && depth > 0) return true;
                 if (depth >= maxDepth) return false;
 
                 let days = getDaysInMonth(y, m);
-                let pat = ['M', lsFuture, 'O', 'O'];
-                let candidates = perms.filter(off => {
-                    for(let i=0; i<4; i++) {
-                        let prev = currentHist[i][currentHist[i].length-1];
-                        if((prev==='N'||prev==='A') && pat[off[i]%4]==='M') return false;
-                    }
-                    return true;
-                });
-                candidates.sort((a, b) => scoreCandidate(a, m, y, currentStats, pat, currentHist, days) - scoreCandidate(b, m, y, currentStats, pat, currentHist, days));
-                candidates = candidates.slice(0, MAX_BRANCHES);
+                let nextStates = [];
+                for (let p = 0; p < perms.length; p++) {
+                    let nxt = transitionStateO1(state, m, y, days, perms[p], baseTotalOff3, baseTotalOff4);
+                    if (nxt) nextStates.push(nxt);
+                }
+                nextStates.sort((a, b) => a.score - b.score);
+                let limit = Math.min(8, nextStates.length);
 
-                for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
-                    let off = candidates[cIdx];
-                    let newH = { 0: currentHist[0].slice(), 1: currentHist[1].slice(), 2: currentHist[2].slice(), 3: currentHist[3].slice() };
-                    let newS = {
-                        workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
-                        firstDayM: { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] },
-                        pairs: Object.assign({}, currentStats.pairs),
-                        lateShifts: { 0: currentStats.lateShifts[0], 1: currentStats.lateShifts[1], 2: currentStats.lateShifts[2], 3: currentStats.lateShifts[3] },
-                        streaks: { work3:{}, off3:{}, off4:{} }
-                    };
-                    
-                    for(let d=0; d<days; d++) {
-                        let mPerson = -1, latePerson = -1;
-                        for (let i = 0; i < 4; i++) {
-                            let s = pat[(d+off[i])%4]; newH[i].push(s);
-                            if(s === 'M') { mPerson = i; newS.workDays[i]++; } 
-                            else if(s !== 'O') { 
-                                latePerson = i;
-                                newS.workDays[i]++; 
-                                newS.lateShifts[i]++; 
-                            }
-                        }
-                        if(mPerson !== -1 && latePerson !== -1) newS.pairs[`${mPerson},${latePerson}`]++;
-                    }
+                let nextM = m + 1, nextY = y;
+                if (nextM > 12) { nextM = 1; nextY++; }
 
-                    for(let i=0; i<4; i++) {
-                        let strk = getStreakCounts(newH[i]);
-                        newS.streaks.work3[i] = strk.work3Inst;
-                        newS.streaks.off3[i] = strk.off3Inst;
-                        newS.streaks.off4[i] = strk.off4Inst;
+                for (let i = 0; i < limit; i++) {
+                    if (canFutureProofO1(nextM, nextY, nextStates[i], depth + 1, maxDepth, baseTotalOff3, baseTotalOff4)) {
+                        return true;
                     }
-
-                    let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
-                    if(miniSolve(nextM, nextY, newS, newH, depth + 1, maxDepth)) return true;
                 }
                 return false;
             }
 
-            function executeSolveExact(targetMonths, requireFutureProof) {
-                let last = historyBlocks[historyBlocks.length-1];
-                let curM = last.m + 1, curY = last.y; if(curM > 12){ curM=1; curY++; }
-                
-                let targetM = curM - 1, targetY = curY; 
-                for (let mk in allLocks) {
-                    let parts = mk.split('-'); let ly = parseInt(parts[0]); let lm = parseInt(parts[1]);
-                    if (ly > curY || (ly === curY && lm >= curM)) { if (ly > targetY || (ly === targetY && lm > targetM)) { targetY = ly; targetM = lm; } }
-                }
+            // ฟังก์ชันสร้างข้อมูล Snapshot ฉบับเต็มเมื่อได้ผู้ชนะแล้ว
+            function buildFinalResultFromWinningPath(winningPath, baseH) {
+                let currentH = { 0: baseH[0].slice(), 1: baseH[1].slice(), 2: baseH[2].slice(), 3: baseH[3].slice() };
+                let blocksSoFar = historyBlocks.slice();
+                let output = [];
 
-                let results = [], baseH = buildBaseHistory(historyBlocks), baseS = calculateStats(baseH, historyBlocks);
-
-                function solve(m, y, currentStats, currentHist, depth) {
-                    let works = Object.values(currentStats.workDays);
-                    let isHoursEqual = works.length > 0 && works.every(val => val === works[0]);
-                    let passedTarget = (y > targetY || (y === targetY && m > targetM));
-
-                    if (depth === targetMonths) {
-                        if (passedTarget && isHoursEqual) {
-                            if (requireFutureProof) {
-                                let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
-                                return miniSolve(nextM, nextY, currentStats, currentHist, 0, 3);
-                            }
-                            return true;
+                for (let step of winningPath) {
+                    let stepPat = ['M', step.ls, 'O', 'O'];
+                    for (let d = 0; d < step.days; d++) {
+                        for (let i = 0; i < 4; i++) {
+                            currentH[i].push(stepPat[(d + step.off[i]) % 4]);
                         }
-                        return false;
                     }
-                    if (depth > targetMonths) return false;
-
-                    let mk = y + '-' + String(m).padStart(2, '0'), days = getDaysInMonth(y, m);
-                    let pat = ['M', lsFuture, 'O', 'O'];
-
-                    let candidates = perms.filter(off => {
-                        for(let i=0; i<4; i++) {
-                            let prev = currentHist[i][currentHist[i].length-1];
-                            if((prev==='N'||prev==='A') && pat[off[i]%4]==='M') return false;
-                        }
-                        if(allLocks[mk]) {
-                            for(let i=0; i<4; i++) if(allLocks[mk][i]) {
-                                for(let d in allLocks[mk][i]) if(pat[(parseInt(d)-1+off[i])%4] !== allLocks[mk][i][d]) return false;
-                            }
-                        }
-                        return true;
+                    blocksSoFar.push({ m: step.m, y: step.y, days: step.days, offsets: step.off, lateShift: step.ls });
+                    let snap = { 0: currentH[0].slice(), 1: currentH[1].slice(), 2: currentH[2].slice(), 3: currentH[3].slice() };
+                    let statsAtEnd = calculateStats(snap, blocksSoFar);
+                    output.push({
+                        m: step.m,
+                        y: step.y,
+                        days: step.days,
+                        off: step.off,
+                        ls: step.ls,
+                        historySnapshot: snap,
+                        statsAtEnd: statsAtEnd
                     });
+                }
+                return output;
+            }
 
-                    candidates.sort((a, b) => scoreCandidate(a, m, y, currentStats, pat, currentHist, days) - scoreCandidate(b, m, y, currentStats, pat, currentHist, days));
-                    candidates = candidates.slice(0, MAX_BRANCHES);
+            // =========================================================================
+            // 🚀 เริ่มต้นกระบวนการค้นหาด้วย Progressive Beam Search
+            // =========================================================================
+            reportProgress(5, "กำลังเตรียมข้อมูลประวัติเวร...", "วิเคราะห์ฐานข้อมูลเริ่มต้น");
+            await sleep(15);
 
-                    for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
-                        let off = candidates[cIdx];
-                        let newH = { 0: currentHist[0].slice(), 1: currentHist[1].slice(), 2: currentHist[2].slice(), 3: currentHist[3].slice() };
-                        let newS = {
-                            workDays: { 0: currentStats.workDays[0], 1: currentStats.workDays[1], 2: currentStats.workDays[2], 3: currentStats.workDays[3] },
-                            firstDayM: { 0: currentStats.firstDayM[0], 1: currentStats.firstDayM[1], 2: currentStats.firstDayM[2], 3: currentStats.firstDayM[3] },
-                            pairs: Object.assign({}, currentStats.pairs),
-                            lateShifts: { 0: currentStats.lateShifts[0], 1: currentStats.lateShifts[1], 2: currentStats.lateShifts[2], 3: currentStats.lateShifts[3] },
-                            streaks: { work3:{}, off3:{}, off4:{} }
-                        };
+            let baseH = buildBaseHistory(historyBlocks);
+            let baseS = calculateStats(baseH, historyBlocks);
+            let baseTotalOff3 = baseS.streaks.off3[0] + baseS.streaks.off3[1] + baseS.streaks.off3[2] + baseS.streaks.off3[3];
+            let baseTotalOff4 = baseS.streaks.off4[0] + baseS.streaks.off4[1] + baseS.streaks.off4[2] + baseS.streaks.off4[3];
 
-                        for(let i=0; i<4; i++) if(pat[off[i]%4]==='M') newS.firstDayM[i]++;
-                        
-                        for(let d=0; d<days; d++) {
-                            let mPerson = -1, latePerson = -1; 
-                            for (let i = 0; i < 4; i++) {
-                                let s = pat[(d+off[i])%4]; newH[i].push(s);
-                                if(s === 'M') { mPerson = i; newS.workDays[i]++; } 
-                                else if(s !== 'O') { 
-                                    latePerson = i; 
-                                    newS.workDays[i]++; 
-                                    newS.lateShifts[i]++; 
+            let lastBlock = historyBlocks[historyBlocks.length - 1];
+            let curM = lastBlock.m + 1, curY = lastBlock.y;
+            if (curM > 12) { curM = 1; curY++; }
+
+            // หาเดือนสุดท้ายที่มีการล็อคเวร
+            let targetM = curM - 1, targetY = curY;
+            for (let mk in allLocks) {
+                let parts = mk.split('-');
+                let ly = parseInt(parts[0]), lm = parseInt(parts[1]);
+                if (ly > curY || (ly === curY && lm >= curM)) {
+                    if (ly > targetY || (ly === targetY && lm > targetM)) {
+                        targetY = ly; targetM = lm;
+                    }
+                }
+            }
+
+            let initialLast2 = [];
+            for (let i = 0; i < 4; i++) {
+                let len = baseH[i].length;
+                initialLast2.push([baseH[i][len - 2], baseH[i][len - 1]]);
+            }
+
+            const BEAM_WIDTH = 350; // เก็บเส้นทางคู่ขนานที่ดีที่สุด 350 เส้นทางต่อเดือน
+            let beam = [{
+                stats: baseS,
+                last2: initialLast2,
+                workOver3Count: 0,
+                score: 0,
+                path: []
+            }];
+
+            let bestFutureProofState = null;
+            let bestEqualHoursFallback = null;
+            let m = curM, y = curY;
+
+            for (let depth = 1; depth <= maxSearchLimit; depth++) {
+                let progressBase = 10 + Math.round(((depth - 1) / maxSearchLimit) * 75);
+                reportProgress(
+                    progressBase,
+                    `กำลังค้นหาเดือนที่ ${depth}/${maxSearchLimit} (${ String(m).padStart(2, '0') }/${y})...`,
+                    `สำรวจเส้นทางคู่ขนาน ${beam.length.toLocaleString()} รูปแบบ`
+                );
+                await sleep(18);
+
+                let mk = `${y}-${String(m).padStart(2, '0')}`;
+                let days = getDaysInMonth(y, m);
+
+                // คัดกรองเฉพาะ Permutations ที่ไม่ขัดแย้งกับตารางล็อคเวรในเดือนนั้น
+                let validPermsForLock = perms.filter(off => {
+                    if (allLocks[mk]) {
+                        for (let i = 0; i < 4; i++) {
+                            if (allLocks[mk][i]) {
+                                for (let d in allLocks[mk][i]) {
+                                    if (pat[(parseInt(d) - 1 + off[i]) % 4] !== allLocks[mk][i][d]) return false;
                                 }
                             }
-                            if(mPerson !== -1 && latePerson !== -1) newS.pairs[`${mPerson},${latePerson}`]++;
-                        }
-
-                        for(let i=0; i<4; i++) {
-                            let strk = getStreakCounts(newH[i]);
-                            newS.streaks.work3[i] = strk.work3Inst;
-                            newS.streaks.off3[i] = strk.off3Inst;
-                            newS.streaks.off4[i] = strk.off4Inst;
-                        }
-
-                        let nextM = m + 1, nextY = y; if(nextM > 12){ nextM=1; nextY++; }
-                        if(solve(nextM, nextY, newS, newH, depth + 1)) {
-                            let finalSnapshot = { 0: newH[0].slice(), 1: newH[1].slice(), 2: newH[2].slice(), 3: newH[3].slice() };
-                            results.push({m, y, days, off, ls: lsFuture, historySnapshot: finalSnapshot, statsAtEnd: newS});
-                            return true;
                         }
                     }
-                    return false;
+                    return true;
+                });
+
+                let nextBeam = [];
+                for (let bIdx = 0; bIdx < beam.length; bIdx++) {
+                    let state = beam[bIdx];
+                    for (let pIdx = 0; pIdx < validPermsForLock.length; pIdx++) {
+                        let nxt = transitionStateO1(state, m, y, days, validPermsForLock[pIdx], baseTotalOff3, baseTotalOff4);
+                        if (nxt) nextBeam.push(nxt);
+                    }
                 }
 
-                if (solve(curM, curY, baseS, baseH, 0)) {
-                    return results.reverse();
+                if (nextBeam.length === 0) {
+                    beam = [];
+                    break;
                 }
-                return null;
-            }
 
-            let finalRes = null;
-            for (let targetFutureMonths = 1; targetFutureMonths <= maxSearchLimit; targetFutureMonths++) {
-                let resNormal = executeSolveExact(targetFutureMonths, true);
-                if (resNormal) { finalRes = resNormal; break; }
-            }
+                // เรียงลำดับจากคะแนนดีที่สุด (ค่าน้อยที่สุด = ความเหลื่อมล้ำต่ำสุด)
+                nextBeam.sort((a, b) => a.score - b.score);
 
-            if (!finalRes) {
-                for (let targetFutureMonths = 1; targetFutureMonths <= maxSearchLimit; targetFutureMonths++) {
-                    let resNormal = executeSolveExact(targetFutureMonths, false);
-                    if (resNormal) { finalRes = resNormal; break; }
+                let nextM = m + 1, nextY = y;
+                if (nextM > 12) { nextM = 1; nextY++; }
+                let passedTarget = (nextY > targetY || (nextY === targetY && nextM > targetM));
+
+                if (passedTarget) {
+                    // ค้นหาเส้นทางที่ชั่วโมงทำงานของทั้ง 4 คนเท่ากันเป๊ะ
+                    let equalCandidates = nextBeam.filter(st => {
+                        let w = st.stats.workDays;
+                        return w[0] === w[1] && w[1] === w[2] && w[2] === w[3];
+                    });
+
+                    if (equalCandidates.length > 0) {
+                        if (!bestEqualHoursFallback) {
+                            bestEqualHoursFallback = equalCandidates[0];
+                        }
+
+                        reportProgress(
+                            Math.min(92, progressBase + 10),
+                            `พบตารางสมดุลในเดือนที่ ${depth}! กำลังตรวจสอบความต่อเนื่องล่วงหน้า...`,
+                            `คัดกรองผู้ชนะจาก ${equalCandidates.length.toLocaleString()} ทางเลือกที่ชั่วโมงเท่ากันเป๊ะ`
+                        );
+                        await sleep(20);
+
+                        for (let cIdx = 0; cIdx < equalCandidates.length; cIdx++) {
+                            let candidate = equalCandidates[cIdx];
+                            if (canFutureProofO1(nextM, nextY, candidate, 0, 3, baseTotalOff3, baseTotalOff4)) {
+                                bestFutureProofState = candidate;
+                                break;
+                            }
+                        }
+
+                        if (bestFutureProofState) {
+                            break; // ได้คำตอบที่ดีที่สุดอันดับ 1 และผ่านการทดสอบมองการณ์ไกลแล้ว
+                        }
+                    }
                 }
+
+                // ตัดกิ่งให้เหลือเฉพาะ Top BEAM_WIDTH เพื่อไปต่อเดือนถัดไป
+                beam = nextBeam.slice(0, BEAM_WIDTH);
+                m = nextM;
+                y = nextY;
             }
 
-            postMessage({ status: finalRes ? 'SUCCESS' : 'FAIL', data: finalRes });
+            let winningState = bestFutureProofState || bestEqualHoursFallback || (beam.length > 0 ? beam[0] : null);
+
+            if (winningState) {
+                reportProgress(100, "ประมวลผลสำเร็จ 100%!", "กำลังสร้างตารางเวรและสรุปสถิติ...");
+                await sleep(25);
+                let finalRes = buildFinalResultFromWinningPath(winningState.path, baseH);
+                self.postMessage({ status: 'SUCCESS', data: finalRes });
+            } else {
+                reportProgress(100, "เสร็จสิ้นการค้นหา", "ไม่พบตารางที่สอดคล้องกับเงื่อนไข");
+                self.postMessage({ status: 'FAIL', data: null });
+            }
         };
     }
 
@@ -1649,16 +1761,27 @@
         if(historyBlocks.length === 0) return alert("กรุณาใส่ประวัติอย่างน้อย 1 เดือนก่อนครับ");
         
         const btn = document.getElementById('generateBtn');
-        const originalBtnText = btn.innerHTML;
+        const originalBtnText = '🚀 จัด ROSTER';
         
-        btn.innerHTML = '⏳ กำลังประมวลผล...';
+        btn.innerHTML = '⏳ กำลังประมวลผล... (0%)';
         btn.disabled = true;
 
-        document.getElementById('resultStatus').innerHTML = "⏳ รอสักครู่...";
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const progressPercentText = document.getElementById('progressPercentText');
+        const progressStageText = document.getElementById('progressStageText');
+        const progressDetailText = document.getElementById('progressDetailText');
+
+        progressContainer.style.display = 'block';
+        progressBarFill.style.width = '0%';
+        progressPercentText.innerText = '0%';
+        progressStageText.innerText = 'เริ่มต้นสมองกล Beam Search...';
+        progressDetailText.innerText = 'กำลังเตรียมข้อมูล...';
+
+        document.getElementById('resultStatus').innerHTML = "⏳ กำลังจัดตารางเวรที่สมดุลที่สุด...";
         document.getElementById('resultStatus').style.color = "var(--warning)";
         document.getElementById('outputSection').style.display = 'block';
         document.getElementById('rosterActionContainer').style.display = 'none';
-        
         document.getElementById('finalStatsContainer').style.display = 'none';
         
         document.getElementById('monthlyTables').innerHTML = '';
@@ -1681,6 +1804,7 @@
             console.error("Worker Error:", err);
             btn.innerHTML = originalBtnText;
             btn.disabled = false;
+            progressContainer.style.display = 'none';
             document.getElementById('resultStatus').innerHTML = "❌ เกิดข้อผิดพลาดในการประมวลผล";
             document.getElementById('resultStatus').style.color = "var(--danger)";
             URL.revokeObjectURL(workerUrl);
@@ -1688,10 +1812,20 @@
         };
 
         worker.onmessage = function(e) {
+            const result = e.data;
+
+            if (result.status === 'PROGRESS') {
+                btn.innerHTML = `⏳ กำลังประมวลผล... (${result.percent}%)`;
+                progressBarFill.style.width = `${result.percent}%`;
+                progressPercentText.innerText = `${result.percent}%`;
+                if (result.stage) progressStageText.innerText = result.stage;
+                if (result.detail) progressDetailText.innerText = result.detail;
+                return;
+            }
+
             btn.innerHTML = originalBtnText; 
             btn.disabled = false;
-            
-            const result = e.data;
+            progressContainer.style.display = 'none';
 
             if (result.status === 'SUCCESS') {
                 const finalRes = result.data;
@@ -1701,7 +1835,6 @@
 
                 window.generatedRoster = finalRes; 
                 document.getElementById('rosterActionContainer').style.display = 'flex'; 
-
                 document.getElementById('finalStatsContainer').style.display = 'block';
 
                 let statusHTML = "";
